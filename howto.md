@@ -4,8 +4,6 @@
 
 ## WIFI in office to connect to picar:
 
-    SSID: NXPCAR
-    PW: Huza/Emo49
 
 ## Raspberry Pi (High level Control Unit):
     
@@ -16,7 +14,7 @@
     or
 
 - ssh pi@raspberrypi.local
-- pw: tugraz
+
 ---
 ### Controlling the car via "WASD" controls:
         
