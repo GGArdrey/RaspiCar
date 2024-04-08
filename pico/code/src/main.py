@@ -1,3 +1,4 @@
+
 import machine
 import time
 import sys
@@ -5,43 +6,9 @@ from vl53l0x import VL53L0X
 from machine import Timer
 
 def range_mapping(x, in_min, in_max, out_min, out_max):
-
         val = (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
-        print(val)
         return int(val)
 
-class SteeringTimer:
-
-    def __init__(self, comm, ms):
-        self.ms = ms
-        self.comm = comm
-        self.comm.steering_timer = self
-        self.steering_flag = False
-        
-
-    def start(self):
-        self.timer = Timer(
-            period=self.ms,
-            mode=Timer.PERIODIC,
-            callback=self.callback
-        )
-
-    def stop(self):
-        self.timer.deinit()
-
-    def callback(self, timer):
-        if not self.steering_flag:
-            if not self.comm.cumulative_steering == 0:
-                print("Centering Wheel, currently at: ", self.comm.cumulative_steering)
-            if self.comm.cumulative_steering < 0:
-                self.comm.cumulative_steering = self.comm.cumulative_steering + 10
-                self.comm.car.servo_steer(self.comm.cumulative_steering)
-            if self.comm.cumulative_steering > 0:
-                self.comm.cumulative_steering = self.comm.cumulative_steering - 10
-                self.comm.car.servo_steer(self.comm.cumulative_steering)
-        self.steering_flag = False
-        
-          
 
 class AliveTimer:
 
@@ -181,10 +148,9 @@ class Comm:
         self.range_max = 100
         self.car = car_inst
         self.sensor = dist_inst
-        self.cumulative_steering = 0
         self.alivetimer = None
         self.disttimer = None
-        self.steering_timer = None
+
 
         self.commands = {"drive": self.drive,
                         "steer": self.steer,
@@ -300,28 +266,12 @@ class Comm:
             self.car.motor_drive("B", val)
 
     def steer(self, args):
-        print("Steering", args)
-        self.steering_timer.steering_flag = True
         if not len(args) == 1:
             print("Invalid parameters for \"steer\", expecting direction (signed integer) between -100 and + 100 %.")
             return
-
         val = int(args[0])
-        if val < 0:
-            if val <= -50:
-                val = -50
-            if self.cumulative_steering > -50:
-                self.cumulative_steering = self.cumulative_steering - 10
-            self.car.servo_steer(self.cumulative_steering)
-        if val > 0:
-            if val >= 50:
-                val = 50
-            if self.cumulative_steering < 50:
-                self.cumulative_steering = self.cumulative_steering + 10
-            self.car.servo_steer(self.cumulative_steering)
-        if val == 0:
-            self.cumulative_steering = 0
-            self.car.servo_steer(self.cumulative_steering)
+        print("set servo to ", val)
+        self.car.servo_steer(val)
 
     def check_servo(self, args):
         print("Servo Checking", args)    
@@ -333,16 +283,15 @@ class Comm:
     
 
 class Car:
-    servo_neutral = 4500
-    servo_max_left = 2500
-    servo_max_right = 6500
-    servo_frequency = 50
-    motor_frequency = 15000
-    stop_flag = False
-    direction = ""
-    led = machine.Pin(25, machine.Pin.OUT)
-
     def __init__(self):
+        self.servo_neutral = 4500
+        self.servo_max_left = 2500
+        self.servo_max_right = 6500
+        self.servo_frequency = 50
+        self.motor_frequency = 15000
+        self.stop_flag = False
+        self.direction = ""
+        self.led = machine.Pin(25, machine.Pin.OUT)
         # init pins
 
         # servo
@@ -419,17 +368,13 @@ class Car:
             print("ERROR: Function needs id to be either 'A' or 'B'.")
 
     def servo_steer(self, in_amount):
-        amount = 0
-        if in_amount < 0:
-            amount = range_mapping(in_amount, -100, 0, 2501, 4500)
-        if in_amount >= 0:
-            amount = range_mapping(in_amount, 0, 100, 4500, 6499)
+        amount = range_mapping(in_amount, -100, 100, self.servo_max_left, self.servo_max_right)
+        if amount < self.servo_max_left:
+            amount = self.servo_max_left
+        elif amount > self.servo_max_right:
+            amount = self.servo_max_right
 
-        if amount > self.servo_max_left and amount < self.servo_max_right:
-            self.servo_pwm.duty_u16(amount)
-        else:
-            print("Amount: ", amount)
-            print("ERROR: Invalid amount of steering, amount must be between 2500 and 6500.")
+        self.servo_pwm.duty_u16(amount)
 
 
     def perform__full_check(self):
@@ -623,19 +568,13 @@ if __name__ == "__main__":
     keepalive_timer.start()
     distance_timer = DistanceTimer(comm, 100)
     distance_timer.start()
-    steering_timer = SteeringTimer(comm, 100)
-    steering_timer.start()
+
 
     time.sleep(1)
     #picar.perform_check(1)
 
-    #while True:
-    #    time.sleep(0.5)
-    #    led.toggle()
-
     comm.process()
     
-
 
 
 
