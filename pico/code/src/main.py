@@ -224,10 +224,7 @@ class Comm:
         self.sensor.direction = "b"    
 
     def toggleKA(self, args):
-        if self.alivetimer.KAtoggle:
-            self.alivetimer.KAtoggle = False
-        else:
-            self.alivetimer.KAtoggle = True
+        self.alivetimer.KAtoggle = not self.alivetimer.KAtoggle
             
     def keepalive(self, args):
         self.alivetimer.alive = True
@@ -376,7 +373,6 @@ class Car:
 
         self.servo_pwm.duty_u16(amount)
 
-
     def perform__full_check(self):
         #Testing Servo
         print("Testing servo...")
@@ -503,7 +499,6 @@ class Car:
         self.servo_steer(0)
 
         print("Servo Check done.")
-
 
     def motor_check(self):
         print("Motor Check")
