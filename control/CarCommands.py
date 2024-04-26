@@ -10,7 +10,9 @@ class CarCommands:
 
     @steer.setter
     def steer(self, value: float):
-        self._steer = value
+        if not isinstance(value, (float, int)):  # Allow int as well, since they can be safely converted to float.
+            raise TypeError("Steer value must be a float or int")
+        self._steer = float(value)
 
     @property
     def throttle(self) -> float:
@@ -18,7 +20,9 @@ class CarCommands:
 
     @throttle.setter
     def throttle(self, value: float):
-        self._throttle = value
+        if not isinstance(value, (float, int)):  # Same allowance for int.
+            raise TypeError("Throttle value must be a float or int")
+        self._throttle = float(value)
 
     @property
     def stop(self) -> float:
@@ -26,4 +30,6 @@ class CarCommands:
 
     @stop.setter
     def stop(self, value: float):
-        self._stop = value
+        if not isinstance(value, (float, int)):
+            raise TypeError("Stop value must be a float or int")
+        self._stop = float(value)

@@ -1,9 +1,11 @@
-
 import serial
+from threading import Lock
+
 class CommandInterface:
     def __init__(self):
         port = "/dev/ttyS0"
-        baudrate = 115200
+        baudrate = 9600
+        self.lock = Lock()
         # 8N1
 
         try:
@@ -13,25 +15,30 @@ class CommandInterface:
             self.uart = None
 
     def sensor_toggle(self):
-        print("toggled sensors", end="\r\n")
-        if self.uart:
-          self.uart.write(b'toggleSensors\r')
+        with self.lock:
+            print("toggled sensors", end="\r\n")
+            if self.uart:
+                self.uart.write(('toggleSensors\r').encode('utf8'))
 
     def stop(self):
-        print("stop", end="\r\n")
-        if self.uart:
-            self.uart.write(b'drive,0\r')
-            self.uart.write(b'steer,0\r')
+        with self.lock:
+            print("stop", end="\r\n")
+            if self.uart:
+                self.uart.write(('drive,0\r').encode('utf8'))
+                self.uart.write(('steer,0\r').encode('utf8'))
 
     def throttle(self, value):
-        value = value * 100
-        #print("throttle " + str(value), end="\r\n")
-        if self.uart:
-          self.uart.write(bytes('drive,' + str(int(value)) + '\r',encoding='utf8'))
+        with self.lock:
+            value = value * 100
+            #print("sending throttle " + str(value), end="\r\n")
+            if self.uart:
+                self.uart.write(('drive,' + str(int(value)) + '\r').encode('utf-8'))
+                #print("sent throttle ")
 
     def steer(self, value):
-        value = value*100
-        #print("steer " + str(value), end="\r\n")
-        if self.uart:
-            self.uart.write(bytes('steer,'+ str(int(value)) + '\r',encoding='utf8'))
-
+        with self.lock:
+            value = value * 100
+            print("sending steer " + str(value), end="\r\n")
+            if self.uart:
+                num_bytes = self.uart.write(('steer,' + str(int(value)) + '\r').encode('utf-8'))
+                print("sent steer, written bytes: ", num_bytes)

@@ -1,6 +1,7 @@
 
 import machine
 import time
+import utime
 import sys
 from vl53l0x import VL53L0X
 from machine import Timer
@@ -139,8 +140,8 @@ class Distance:
 
 class Comm:
     def __init__(self, car_inst, dist_inst):
-        self.uart = machine.UART(0, 115200)                          # init with given baudrate 
-        self.uart.init(115200, bits=8, parity=None, stop=1)          # init with given parameters
+        self.uart = machine.UART(0, 9600)                          # init with given baudrate
+        self.uart.init(9600, bits=8, parity=None, stop=1)          # init with given parameters 115200
         
         #self.uart = sys.stdin
 
@@ -164,37 +165,52 @@ class Comm:
                         "driveb":self.driveb,
                         "stop":self.stop}
 
-
-    def readline(self):
-        buf = ""
+    def readline(self, timeout=500):
+        buf = bytearray()
+        start_time = utime.ticks_ms()  # Assuming use of `utime` for timing; adjust as needed for your environment
         while True:
+            if utime.ticks_diff(utime.ticks_ms(), start_time) > timeout:
+                print("Timeout reached, no full command received")
+                return ''  # Return empty string on timeout
             char = self.uart.read(1)
             if not char:
-                continue
-            #print("raw buffer:", buf)
-            if char.decode() == "\r":
-                break
-            buf += char.decode()
-        #buf = buf.strip()
-        return buf
+                continue  # No data received; loop until data is available
+            if char == b'\r':
+                break  # End of command; exit loop
+            buf += char  # Accumulate the data in the buffer
+        try:
+            return buf.decode('utf-8')  # Attempt to decode the buffer to a string
+        except:
+            print("received wrong or corrupted data: ", buf)
+            return ''  # Return an empty string if decoding fails
 
+        # buf = ""
+        # while True:
+        #     char = self.uart.read(1)
+        #     if not char:
+        #         continue
+        #     print("raw char: ", char)
+        #     print("raw buffer:", buf)
+        #     if char.decode() == "\r":
+        #         break
+        #     buf += char.decode()
+        # #buf = buf.strip()
+        # return buf
 
     def process(self):
         while True:
             line = self.readline()
-            print("got input:", line)
+            print("received input:", line)
             if not line:
                 continue
             line = line.strip()
             if not line:
-                #distance.measure()
                 continue
             inst = line.split(",")
-            #print("split cmd:", inst)
             command = inst[0]
             func = self.commands.get(command, None)
             if not func:
-                print("invalid command: ", func)
+                print("invalid command: ", command)
                 continue
             args = inst[1:]
             func(args)
@@ -244,23 +260,9 @@ class Comm:
             val = -100
         if val > 100:
             val = 100
-        
-        
 
-        if val >= 0:
-            self.sensor.direction = "f"
-            if self.car.stop_flag:
-                val = 0
-                return
-            self.car.motor_drive("A", val)
-            self.car.motor_drive("B", val)
-        if val < 0:
-            self.sensor.direction = "b"
-            if self.car.stop_flag:
-                val = 0
-                return
-            self.car.motor_drive("A", val)
-            self.car.motor_drive("B", val)
+        self.car.motor_drive("A", val)
+        self.car.motor_drive("B", val)
 
     def steer(self, args):
         if not len(args) == 1:
@@ -557,12 +559,12 @@ if __name__ == "__main__":
     led = machine.Pin(25, machine.Pin.OUT)
     picar = Car()
     
-    distance = Distance()
-    comm = Comm(picar, distance)
-    keepalive_timer = AliveTimer(comm, 2000)
-    keepalive_timer.start()
-    distance_timer = DistanceTimer(comm, 100)
-    distance_timer.start()
+    # distance = Distance()
+    comm = Comm(picar, None) #distance
+    # keepalive_timer = AliveTimer(comm, 2000)
+    # keepalive_timer.start()
+    # distance_timer = DistanceTimer(comm, 100)
+    # distance_timer.start()
 
 
     time.sleep(1)

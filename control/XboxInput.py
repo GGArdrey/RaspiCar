@@ -47,7 +47,7 @@ class XboxInput(IInputSource):
         self._joystick = None
         self._connect_controller(joystick_index)
         if not self._joystick:
-            raise SystemExit("No controller found.") # TODO handle this case differently?
+            raise Exception("No controller found.") # TODO handle this case?
 
     def _deinit(self):
         pygame.quit()
