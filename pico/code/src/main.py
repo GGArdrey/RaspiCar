@@ -1,8 +1,6 @@
 
 import machine
 import time
-import utime
-import sys
 from vl53l0x import VL53L0X
 from machine import Timer
 
@@ -140,8 +138,8 @@ class Distance:
 
 class Comm:
     def __init__(self, car_inst, dist_inst):
-        self.uart = machine.UART(0, 9600)                          # init with given baudrate
-        self.uart.init(9600, bits=8, parity=None, stop=1)          # init with given parameters 115200
+        self.uart = machine.UART(0, 115200)                          # init with given baudrate
+        self.uart.init(115200, bits=8, parity=None, stop=1, timeout = 100)          # init with given parameters 115200
         
         #self.uart = sys.stdin
 
@@ -165,37 +163,28 @@ class Comm:
                         "driveb":self.driveb,
                         "stop":self.stop}
 
-    def readline(self, timeout=500):
-        buf = bytearray()
-        start_time = utime.ticks_ms()  # Assuming use of `utime` for timing; adjust as needed for your environment
-        while True:
-            if utime.ticks_diff(utime.ticks_ms(), start_time) > timeout:
-                print("Timeout reached, no full command received")
-                return ''  # Return empty string on timeout
-            char = self.uart.read(1)
-            if not char:
-                continue  # No data received; loop until data is available
-            if char == b'\r':
-                break  # End of command; exit loop
-            buf += char  # Accumulate the data in the buffer
+    def readline(self):
+        buffer = bytearray()
         try:
-            return buf.decode('utf-8')  # Attempt to decode the buffer to a string
-        except:
-            print("received wrong or corrupted data: ", buf)
-            return ''  # Return an empty string if decoding fails
+            while True:
+                char = self.uart.read(1)  # Read one byte at a time
+                if char:
+                    # Check if the end of a line has been reached
+                    if char == b'\n' or char == b'\r':  # Assuming newline or carriage return ends the line
+                        break
+                    buffer += char
 
-        # buf = ""
-        # while True:
-        #     char = self.uart.read(1)
-        #     if not char:
-        #         continue
-        #     print("raw char: ", char)
-        #     print("raw buffer:", buf)
-        #     if char.decode() == "\r":
-        #         break
-        #     buf += char.decode()
-        # #buf = buf.strip()
-        # return buf
+            # If we exit the loop, we attempt to decode what we have
+            if buffer:
+                line = buffer.decode('utf-8').strip('\r\n')
+                print("Received line:", line)
+                return line
+            else:
+                print("Received an empty line or just newline")
+                return ''
+        except Exception as e:
+            print("Error during UART read or decode:", str(e))
+            return ''
 
     def process(self):
         while True:
