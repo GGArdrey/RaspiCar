@@ -32,8 +32,8 @@ class CommandInterface:
             value = value * 100
             #print("sending throttle " + str(value), end="\r\n")
             if self.uart:
-                self.uart.write(('drive,' + str(int(value)) + '\n').encode('utf-8'))
-                #print("sent throttle ")
+                num_bytes = self.uart.write(('drive,' + str(int(value)) + '\n').encode('utf-8'))
+                #print("sent throttle, written bytes: ", num_bytes)
 
     def steer(self, value):
         with self.lock:

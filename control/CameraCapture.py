@@ -2,24 +2,35 @@ import cv2
 import threading
 from IObservable import IObservable
 
-
 class CameraCapture(IObservable):
-    def __init__(self, camera_source=0):  # TODO height width of camera frame
+    def __init__(self, camera_source=0, frame_width=None, frame_height=None):
         super().__init__()
         self.camera_source = camera_source
         self.cap = cv2.VideoCapture(camera_source)
-        # self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.FRAME_WIDTH)
-        # self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.FRAME_HEIGHT)
+        if frame_width and frame_height:
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, frame_width)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_height)
         self.frame_lock = threading.Lock()
         self.current_frame = None
+        self.running = False
+        self.capture_thread = None
+
+    def start(self):
+        if not self.running:
+            print("Starting Camera Capture Thread..")
+            self.running = True
+            self.capture_thread = threading.Thread(target=self.update_frame)
+            self.capture_thread.start()
+
+    def stop(self):
+        if self.running:
+            self.running = False
+            if self.capture_thread:
+                self.capture_thread.join()
+            self.release()
 
     def update_frame(self):
-        '''
-        Notifies all its observers and provides a frame. Additionally, the current frame is also saved in this class,
-        protected by a mutex
-        :return:
-        '''
-        while True:
+        while self.running:
             ret, frame = self.cap.read()
             if ret:
                 with self.frame_lock:
@@ -27,10 +38,14 @@ class CameraCapture(IObservable):
                 self._notify_observers(frame)
             else:
                 print("Error capturing frame.")
+                break
 
     def get_frame(self):
         with self.frame_lock:
-            return self.current_frame.copy()
+            return self.current_frame.copy() if self.current_frame is not None else None
 
     def release(self):
-        self.cap.release()
+        with self.frame_lock:
+            if self.cap.isOpened():
+                self.cap.release()
+                print("Camera released.")

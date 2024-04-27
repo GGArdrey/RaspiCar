@@ -13,23 +13,32 @@ class LaneDetectionHough(IControlAlgorithm):
 
     def __init__(self):
         super().__init__()
-        super().__init__()
         self.lock = threading.Lock()
         self.new_frame_condition = threading.Condition(self.lock)
         self.latest_frame = None
         self.car_commands = CarCommands()
-        self.processing_thread = threading.Thread(target=self.wait_and_process_frames)
-        self.processing_thread.start()
+        self.processing_thread = None
+        self.running = False
+
+    def start(self):
+        if not self.running:
+            print("Starting Lane Detection Hough Thread...")
+            self.running = True
+            self.processing_thread = threading.Thread(target=self.wait_and_process_frames)
+            self.processing_thread.start()
+
+    def stop(self):
+        if self.running:
+            self.running = False
+            with self.new_frame_condition:
+                self.new_frame_condition.notify()  # Wake up the thread if it's waiting
+            if self.processing_thread:
+                self.processing_thread.join()
 
     def update(self, frame):
         with self.new_frame_condition:
             self.latest_frame = frame
             self.new_frame_condition.notify()  # Signal that a new frame is available
-
-
-    def read_inputs(self):
-        with self.lock:
-            return self.car_commands.copy()
 
     def wait_and_process_frames(self):
         while True:
@@ -43,7 +52,7 @@ class LaneDetectionHough(IControlAlgorithm):
             self.process_frame(frame)
 
     def process_frame(self, frame):
-        with timer("Process Frame Execution"):
+        with timer("LaneDetectionHough.process_frame Execution"):
             FRAME_WIDTH, FRAME_HEIGHT, _ = frame.shape
             car_commands = CarCommands()
 
@@ -61,6 +70,10 @@ class LaneDetectionHough(IControlAlgorithm):
             # frame = self.visualize_lines(frame, left_lines, right_lines) #TODO enable
             # frame = self.visualize_center(frame, road_center)
             # car_commands.steer = self.compute_steering(road_center)
+
+    def read_inputs(self):
+        with self.lock:
+            return self.car_commands.copy()
 
     def denoise_frame(self, frame):
         denoised = cv2.GaussianBlur(frame, (3, 3), 1)

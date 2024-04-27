@@ -17,46 +17,90 @@ class RPiServer(IObserver):
         self.server_socket.listen(1)
         self.lock = threading.Lock()
         self.clients = []
+        self.frame_condition = threading.Condition(self.lock)
+        self.running = False
+        self.latest_frame_data = None # Storing latest camera image
+        self.accept_thread = None
+        self.send_thread = None
         print(f'Server listening on {host}:{port}')
 
+    def start(self):
+        if not self.running:
+            print("Starting Server Accepting and Sending Threads")
+            self.running = True
+            self.server_socket.listen(1)
+            self.accept_thread = threading.Thread(target=self.start_accepting_connections)
+            self.send_thread = threading.Thread(target=self.send_frames_to_clients)
+            self.accept_thread.start()
+            self.send_thread.start()
+
+
+    def stop(self):
+        if self.running:
+            self.running = False
+            if self.accept_thread:
+                self.accept_thread.join()
+            if self.send_thread:
+                self.send_thread.join()
+
+            for client in self.clients:
+                client.close()
+            self.server_socket.close()
+            print("Server stopped and all connections closed.")
+
     def start_accepting_connections(self):
-        '''
-        Listens and accepts incoming connections. Those connections are stored inside this server class.
-        This function is meant to be run in a thread, as it blocks while listening for incoming connections
-        :return:
-        '''
-        while True:
-            print('Waiting for a connection...')
-            client_socket, addr = self.server_socket.accept()
-            #readable, _, _ = select.select(inputs, outputs, inputs, 1)  # using select as non-blocking I/O
-            print(f'Connected with {addr}')
-            with self.lock:
-                self.clients.append(client_socket)
+        while self.running:
+            try:
+                client_socket, addr = self.server_socket.accept()
+                print(f'Connected with {addr}')
+                with self.lock:
+                    self.clients.append(client_socket)
+            except socket.error as e:
+                if self.running:  # To distinguish expected stop errors from actual errors
+                    print(f"Accept error: {e}")
+                break
 
-
-    # def handle_keyboard_input(self, conn):
-    #     while True:
-    #         data = conn.recv(1024)
-    #         if not data:
-    #             break
-    #         # Process the received keyboard input data
-    #         keyboard_commands = data.decode()
-    #         self.keyboard_input.process_keyboard_commands(keyboard_commands)
 
     def update(self, frame):
         '''
-        Sends the received image to all clients
-        :param frame: OpenCV image from the observable object
+        Takes the latest frame from the camera and updates latest_frame_data. Also notifies thread waiting on that data
+        :param frame:
         :return:
         '''
         encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 90]
         result, encoded_frame = cv2.imencode('.jpg', frame, encode_param)
-        with self.lock:
-            for client in self.clients:
+        with self.frame_condition:
+            self.latest_frame_data = (encoded_frame.tobytes(), len(encoded_frame))
+            self.frame_condition.notify_all()  # Notify all waiting threads that a new frame is available
+
+    def send_frames_to_clients(self):
+        while True:
+            with self.frame_condition:
+                self.frame_condition.wait()  # Wait until a frame is ready
+                if self.latest_frame_data is None:
+                    continue
+                frame_bytes, frame_size = self.latest_frame_data
+
+            # Copy the list of clients to avoid holding the lock while sending data
+            with self.lock:
+                clients = self.clients.copy()
+
+            for client in clients:
                 try:
-                    frame_size = len(encoded_frame)
-                    client.sendall(struct.pack('>L', frame_size) + encoded_frame.tobytes())
+                    client.sendall(struct.pack('>L', frame_size) + frame_bytes)
                 except Exception as e:
                     print(f"Error sending video to client: {e}")
-                    self.clients.remove(client)
-                    client.close()
+                    with self.lock:
+                        self.clients.remove(client)
+                        client.close()
+
+    def stop_server(self):
+        with self.frame_condition:
+            self.latest_frame_data = None
+            self.frame_condition.notify_all()  # Wake up the thread if it's waiting, to allow it to exit
+
+        # Properly close all client sockets and the server socket
+        with self.lock:
+            for client in self.clients:
+                client.close()
+            self.server_socket.close()

@@ -15,42 +15,20 @@ from CommandInterface import CommandInterface
 from RPiServer import RPiServer
 from CameraCapture import CameraCapture
 
-
-camera_capture = CameraCapture()
-rpi_server = RPiServer()
-lane_detection_hough = LaneDetectionHough()
-
-
-camera_capture.register_observer(rpi_server)
-camera_capture.register_observer(lane_detection_hough)
-
-
 xbox_input = XboxInput()
+xbox_input.start()  # Start the input polling thread
+
+lane_detector = LaneDetectionHough()
+lane_detector.start()  # Begin processing frames thread
+
+server = RPiServer()
+server.start()  # starting acceting and sending thread inside server
+
+camera = CameraCapture()
+camera.register_observer(server)
+camera.register_observer(lane_detector)
+camera.start()  # Start capturing frames and sending it to observers thread
+
 command_interface = CommandInterface()
-control_manager = ControlManager(command_interface, xbox_input, lane_detection_hough)
-
-
-
-capture_thread = threading.Thread(target=camera_capture.update_frame)
-#capture_thread.daemon = True  # Set as daemon thread to stop when main program exits
-capture_thread.start()
-print("Started Camera Capture...")
-
-server_thread = threading.Thread(target=rpi_server.start_accepting_connections)
-#server_thread.daemon = True  # Set as daemon thread to stop when main program exits
-server_thread.start()
-print("Started Server...")
-
-control = threading.Thread(target=control_manager.run)
-#control.daemon = True  # Set as daemon thread to stop when main program exits
-control.start()
-print("Started Control Manager...")
-
-
-
-
-
-
-
-while True:
-    control_manager.run()
+control_manager = ControlManager(command_interface, xbox_input, lane_detector)
+control_manager.start() # start thread

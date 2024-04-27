@@ -5,7 +5,7 @@ from CommandInterface import CommandInterface
 from IControlAlgorithm import IControlAlgorithm
 from IInputSource import IInputSource
 
-from threading import Lock
+from threading import Thread, Lock
 
 class ControlManager:
     def __init__(self, command_interface, input_source, control_algorithm):
@@ -13,9 +13,27 @@ class ControlManager:
         self._command_interface: CommandInterface = command_interface
         self._input_source: IInputSource = input_source
         self._control_algorithm: IControlAlgorithm = control_algorithm
+        self.running = False
+        self.thread = None
+
+    def start(self):
+        if not self.running:
+            print("Starting Control Manager Thread...")
+            self.running = True
+            self.thread = Thread(target=self.run)
+            self.thread.start()
+
+    def stop(self):
+        if self.running:
+            self.running = False
+            if self.thread:
+                self.thread.join()
+            # Ensure clean shutdown, like stopping any motor or sending a stop command
+            self._command_interface.stop()
 
     def run(self):
         while True:
+            time.sleep(0.1) # TODO this is used to prevent UART communication failures if too fast
             # Process input source
             input_commands = self._input_source.read_inputs()
 
@@ -55,7 +73,7 @@ class ControlManager:
         return merged_commands
 
     def _execute_commands(self, car_commands: CarCommands):
-        #with self.lock:
+        # TODO maybe remake command interface to be more like _command_interface.execute(car_commands)
         if car_commands.stop:
             self._command_interface.stop()
         else:

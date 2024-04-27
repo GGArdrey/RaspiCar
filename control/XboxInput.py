@@ -42,6 +42,7 @@ bottom -> axis 2 (default -1; fully pressed 1)
 class XboxInput(IInputSource):
 
     def __init__(self, joystick_index=0, input_freq=10):
+        self.thread = None
         pygame.init()
         pygame.joystick.init()
         self._input_freq = input_freq
@@ -50,12 +51,15 @@ class XboxInput(IInputSource):
         self.lock = Lock()
         self.running = True  # Flag to control the thread loop
         self.connected = self._connect_controller(joystick_index)
+
+    def start(self):
+        self.running = True
         self.thread = Thread(target=self._poll_inputs)
         self.thread.start()
 
-    def _deinit(self):
+    def stop(self):
         self.running = False
-        self.thread.join()  # Ensure the thread has finished before quitting pygame
+        self.thread.join()
         pygame.quit()
 
     def _rumble_controller(self):
