@@ -4,10 +4,10 @@ import struct
 import threading
 
 import cv2
-from IObserver import Observer
+from IObserver import IObserver
 #from control.Webcam import FrameCapture
 
-class RPiServer(Observer):
+class RPiServer(IObserver):
     def __init__(self, keyboard_input=None, host='', port=8000):
         #self.keyboard_input = keyboard_input
         super().__init__()

@@ -3,41 +3,42 @@ import time
 import cv2
 import numpy as np
 from CarCommands import CarCommands
-from IObserver import Observer
+from IControlAlgorithm import IControlAlgorithm
+import threading
 
 
-class LaneDetectionHough(Observer):
+class LaneDetectionHough(IControlAlgorithm):
 
     def __init__(self):
         super().__init__()
+        self.lock = threading.Lock()
+        self.car_commands = CarCommands()
 
     def update(self, frame):
-        #self.process_frame(frame) #TODO how control? Every time when update is called or should it be triggered from control_manager?
-        pass
+        threading.Thread(target=self.process_frame, args=(frame,)).start()
 
-    def process_frame(self, frame) -> CarCommands:
-        self.FRAME_WIDTH, self.FRAME_HEIGHT, _ = frame.shape
-        car_commands = CarCommands()
-        last_ts = time.time()
+    def read_inputs(self):
+        with self.lock:
+            return self.car_commands.copy()
 
-        img = self.denoise_frame(frame)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        # img = threshold_frame(img)
-        img = self.detect_edges(img)
+    def process_frame(self, frame):
+        with self.lock: #TODO can lock be moved further down, maybe just before accessing self.car_commands?
+            FRAME_WIDTH, FRAME_HEIGHT, _ = frame.shape
+            car_commands = CarCommands() # new empty car commands
 
-        img = self.mask_region(img)
+            img = self.denoise_frame(frame)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            img = self.detect_edges(img)
+            img = self.mask_region(img, FRAME_HEIGHT, FRAME_WIDTH)
 
-        left_lines, right_lines, road_center = self.detect_lines(img)
-        #print("roadcenter", road_center)
-        # frame = self.visualize_lines(frame, left_lines, right_lines) #TODO enable
-        # frame = self.visualize_center(frame, road_center)
-        # car_commands.steer = self.compute_steering(road_center)
+            left_lines, right_lines, road_center = self.detect_lines(img, FRAME_HEIGHT, FRAME_WIDTH)
+            car_commands.steer = self.compute_steering(road_center, FRAME_WIDTH)
 
-        ts = time.time()
-        # print(ts - last_ts)
-        last_ts = ts
-
-        return car_commands
+            self.car_commands = car_commands
+            # print("roadcenter", road_center)
+            # frame = self.visualize_lines(frame, left_lines, right_lines) #TODO enable
+            # frame = self.visualize_center(frame, road_center)
+            # car_commands.steer = self.compute_steering(road_center)
 
     def denoise_frame(self, frame):
         denoised = cv2.GaussianBlur(frame, (3, 3), 1)
@@ -52,28 +53,27 @@ class LaneDetectionHough(Observer):
     def detect_edges(self, gray):
         return cv2.Canny(gray, 200, 150)
 
-    def warp_perspective(self, img):
-        height, width = img.shape
-        src_points = np.float32([
-            [int(width * 0.33), int(height * 0.5)],
-            [int(width * 0.66), int(height * 0.5)],
-            [int(width * 0.25), height],
-            [int(width * 0.75), height]
-        ])
+    # def warp_perspective(self, img):
+    #     height, width = img.shape
+    #     src_points = np.float32([
+    #         [int(width * 0.33), int(height * 0.5)],
+    #         [int(width * 0.66), int(height * 0.5)],
+    #         [int(width * 0.25), height],
+    #         [int(width * 0.75), height]
+    #     ])
+    #
+    #     ratio_offset = 100
+    #     dst_points = np.float32([
+    #         [ratio_offset, 0],
+    #         [width - ratio_offset * 2, 0],
+    #         [ratio_offset, height],
+    #         [width - ratio_offset * 2, height]
+    #     ])
+    #
+    #     warp_matrix = cv2.getPerspectiveTransform(src_points, dst_points)
+    #     return cv2.warpPerspective(img, warp_matrix, (width, height))
 
-        ratio_offset = 100
-        dst_points = np.float32([
-            [ratio_offset, 0],
-            [width - ratio_offset * 2, 0],
-            [ratio_offset, height],
-            [width - ratio_offset * 2, height]
-        ])
-
-        warp_matrix = cv2.getPerspectiveTransform(src_points, dst_points)
-        return cv2.warpPerspective(img, warp_matrix, (width, height))
-
-    def mask_region(self, image):
-        height, width = image.shape
+    def mask_region(self, image, height, width):
         polygon = np.array([
             [(0, height), (0, height // 3), (width, height // 3), (width, height)]
         ])
@@ -82,12 +82,11 @@ class LaneDetectionHough(Observer):
         mask = cv2.bitwise_and(image, mask)
         return mask
 
-    def detect_lines(self, img):
+    def detect_lines(self, img, image_height, image_width):
         left_lines = []
         right_lines = []
         left_x_bottom = []  # storing the intersect with the bottom of the image for all left lines
         right_x_bottom = []  # storing the intersect with the bottom of the image for all right lines
-        image_height, image_width = img.shape[:2]
         road_center = None
         lines = cv2.HoughLinesP(img, rho=3, theta=np.pi / 180, threshold=50, minLineLength=30, maxLineGap=5)
         if lines is None:
@@ -113,17 +112,14 @@ class LaneDetectionHough(Observer):
 
         return left_lines, right_lines, road_center
 
-    def compute_steering(self, road_center):
+    def compute_steering(self, road_center, frame_width):
         if road_center is None:
             return 0
 
-        # TODO PID control
         k_p = 0.9
-
-        set_point = self.FRAME_WIDTH / 2  # desired setpoint is center of frame
-        set_point_normalized = set_point / self.FRAME_WIDTH
-        center_normalized = road_center / self.FRAME_WIDTH
-
+        set_point = frame_width / 2  # desired setpoint is center of frame
+        set_point_normalized = set_point / frame_width
+        center_normalized = road_center / frame_width
         error = center_normalized - set_point_normalized
 
         return error * k_p

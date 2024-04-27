@@ -25,11 +25,11 @@ class ControlManager:
                 continue
             else:
                 # Process control algorithm
-                algorithm_commands = self._control_algorithm.process_frame()
+                algorithm_commands = self._control_algorithm.read_inputs()
                 # Merge commands
                 merged_commands = self._merge_commands(input_commands, algorithm_commands)
-                print("Command Interfaces: ", merged_commands.throttle, merged_commands.steer)
-                print("Algorithm Steering: ", algorithm_commands.throttle, algorithm_commands.steer)
+                #print("Command Interfaces: ", merged_commands.throttle, merged_commands.steer)
+                #print("Algorithm Steering: ", algorithm_commands.throttle, algorithm_commands.steer)
                 # Execute merged commands
                 self._execute_commands(merged_commands)
 

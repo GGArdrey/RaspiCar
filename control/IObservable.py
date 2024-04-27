@@ -1,11 +1,12 @@
 from abc import ABC
-class Observable(ABC):
+from IObserver import IObserver
+class IObservable(ABC):
     def __init__(self):
-        self.observers = []
+        self._observers = []
 
-    def register_observer(self, observer):
-        self.observers.append(observer)
+    def register_observer(self, observer : IObserver):
+        self._observers.append(observer)
 
-    def notify_observers(self, data):
-        for observer in self.observers:
+    def _notify_observers(self, data):
+        for observer in self._observers:
             observer.update(data)

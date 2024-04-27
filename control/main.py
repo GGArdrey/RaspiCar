@@ -20,13 +20,14 @@ camera_capture = CameraCapture()
 rpi_server = RPiServer()
 lane_detection_hough = LaneDetectionHough()
 
+
 camera_capture.register_observer(rpi_server)
 camera_capture.register_observer(lane_detection_hough)
 
 
 xbox_input = XboxInput()
 command_interface = CommandInterface()
-control_manager = ControlManager(command_interface, xbox_input, None)
+control_manager = ControlManager(command_interface, xbox_input, lane_detection_hough)
 
 
 

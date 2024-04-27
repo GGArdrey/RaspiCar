@@ -38,7 +38,7 @@ class CommandInterface:
     def steer(self, value):
         with self.lock:
             value = value * 100
-            print("sending steer " + str(value), end="\r\n")
+            #print("sending steer " + str(value), end="\r\n")
             if self.uart:
                 num_bytes = self.uart.write(('steer,' + str(int(value)) + '\n').encode('utf-8'))
-                print("sent steer, written bytes: ", num_bytes)
+                #print("sent steer, written bytes: ", num_bytes)

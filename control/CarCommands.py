@@ -1,8 +1,15 @@
 class CarCommands:
-    def __init__(self):
-        self._steer = 0.0
-        self._throttle = 0.0
-        self._stop = 0.0
+    def __init__(self, steer=0.0, throttle=0.0, stop=0.0):
+        self._steer = steer
+        self._throttle = throttle
+        self._stop = stop
+
+    def copy(self):
+        '''
+        Create a copy of itself
+        :return: CarCommands
+        '''
+        return CarCommands(self._steer, self._throttle, self._stop)
 
     @property
     def steer(self) -> float:

@@ -1,13 +1,13 @@
 import cv2
 import threading
-from IObservable import Observable
+from IObservable import IObservable
 
 
-class CameraCapture(Observable):
+class CameraCapture(IObservable):
     def __init__(self, camera_source=0):  # TODO height width of camera frame
         super().__init__()
         self.camera_source = camera_source
-        self.cap = cv2.VideoCapture(camera_source) # TODO: set framerate
+        self.cap = cv2.VideoCapture(camera_source)
         # self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.FRAME_WIDTH)
         # self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.FRAME_HEIGHT)
         self.frame_lock = threading.Lock()
@@ -24,13 +24,13 @@ class CameraCapture(Observable):
             if ret:
                 with self.frame_lock:
                     self.current_frame = frame
-                self.notify_observers(frame)
+                self._notify_observers(frame)
             else:
                 print("Error capturing frame.")
 
     def get_frame(self):
         with self.frame_lock:
-            return self.current_frame
+            return self.current_frame.copy()
 
     def release(self):
         self.cap.release()
