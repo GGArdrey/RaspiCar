@@ -5,36 +5,58 @@ import numpy as np
 from CarCommands import CarCommands
 from IControlAlgorithm import IControlAlgorithm
 import threading
+from util import timer
+
 
 
 class LaneDetectionHough(IControlAlgorithm):
 
     def __init__(self):
         super().__init__()
+        super().__init__()
         self.lock = threading.Lock()
+        self.new_frame_condition = threading.Condition(self.lock)
+        self.latest_frame = None
         self.car_commands = CarCommands()
+        self.processing_thread = threading.Thread(target=self.wait_and_process_frames)
+        self.processing_thread.start()
 
     def update(self, frame):
-        threading.Thread(target=self.process_frame, args=(frame,)).start()
+        with self.new_frame_condition:
+            self.latest_frame = frame
+            self.new_frame_condition.notify()  # Signal that a new frame is available
+
 
     def read_inputs(self):
         with self.lock:
             return self.car_commands.copy()
 
+    def wait_and_process_frames(self):
+        while True:
+            with self.new_frame_condition:
+                self.new_frame_condition.wait()  # Wait for a new frame
+                frame = self.latest_frame
+                if frame is None:
+                    print("Received None Frame inside LaneDetectionTransform. Exit Thread...")
+                    break  # Allow using None as a shutdown signal
+
+            self.process_frame(frame)
+
     def process_frame(self, frame):
-        with self.lock: #TODO can lock be moved further down, maybe just before accessing self.car_commands?
+        with timer("Process Frame Execution"):
             FRAME_WIDTH, FRAME_HEIGHT, _ = frame.shape
-            car_commands = CarCommands() # new empty car commands
+            car_commands = CarCommands()
 
             img = self.denoise_frame(frame)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             img = self.detect_edges(img)
-            img = self.mask_region(img, FRAME_HEIGHT, FRAME_WIDTH)
+            img = self.mask_region(img,FRAME_HEIGHT, FRAME_WIDTH)
 
             left_lines, right_lines, road_center = self.detect_lines(img, FRAME_HEIGHT, FRAME_WIDTH)
             car_commands.steer = self.compute_steering(road_center, FRAME_WIDTH)
 
-            self.car_commands = car_commands
+            with self.lock:
+                self.car_commands = car_commands
             # print("roadcenter", road_center)
             # frame = self.visualize_lines(frame, left_lines, right_lines) #TODO enable
             # frame = self.visualize_center(frame, road_center)

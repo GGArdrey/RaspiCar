@@ -30,7 +30,7 @@ class ControlManager:
                 merged_commands = self._merge_commands(input_commands, algorithm_commands)
                 #print("Command Interfaces: ", merged_commands.throttle, merged_commands.steer)
                 #print("Algorithm Steering: ", algorithm_commands.throttle, algorithm_commands.steer)
-                # Execute merged commands
+                #Execute merged commands
                 self._execute_commands(merged_commands)
 
     def _merge_commands(self, input_commands: CarCommands, algorithm_commands: CarCommands) -> CarCommands:
