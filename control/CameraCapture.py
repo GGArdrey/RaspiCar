@@ -1,3 +1,5 @@
+import time
+
 import cv2
 import threading
 from IObservable import IObservable
@@ -35,7 +37,7 @@ class CameraCapture(IObservable):
             if ret:
                 with self.frame_lock:
                     self.current_frame = frame
-                self._notify_observers(frame)
+                self._notify_observers(frame.copy(), timestamp = time.time()) #TODO copy()?
             else:
                 print("Error capturing frame.")
                 break

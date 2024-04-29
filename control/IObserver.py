@@ -6,7 +6,7 @@ class IObserver(ABC):
         pass
 
     @abstractmethod
-    def update(self, frame):
+    def update(self, frame, timestamp):
         '''
         Called when an Observable notifies it's observers
         :return:

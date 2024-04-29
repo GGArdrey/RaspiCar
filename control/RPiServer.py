@@ -5,11 +5,13 @@ import threading
 
 import cv2
 from IObserver import IObserver
-#from control.Webcam import FrameCapture
+
+
+# from control.Webcam import FrameCapture
 
 class RPiServer(IObserver):
     def __init__(self, keyboard_input=None, host='', port=8000):
-        #self.keyboard_input = keyboard_input
+        # self.keyboard_input = keyboard_input
         super().__init__()
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -19,7 +21,7 @@ class RPiServer(IObserver):
         self.clients = []
         self.frame_condition = threading.Condition(self.lock)
         self.running = False
-        self.latest_frame_data = None # Storing latest camera image
+        self.latest_frame_data = None  # Storing latest camera image
         self.accept_thread = None
         self.send_thread = None
         print(f'Server listening on {host}:{port}')
@@ -33,7 +35,6 @@ class RPiServer(IObserver):
             self.send_thread = threading.Thread(target=self.send_frames_to_clients)
             self.accept_thread.start()
             self.send_thread.start()
-
 
     def stop(self):
         if self.running:
@@ -60,10 +61,10 @@ class RPiServer(IObserver):
                     print(f"Accept error: {e}")
                 break
 
-
-    def update(self, frame):
+    def update(self, frame, timestamp):
         '''
         Takes the latest frame from the camera and updates latest_frame_data. Also notifies thread waiting on that data
+        :param timestamp:
         :param frame:
         :return:
         '''

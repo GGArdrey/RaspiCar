@@ -3,6 +3,7 @@ import pygame
 from CarCommands import CarCommands
 from IInputSource import IInputSource
 from threading import Thread, Lock
+from IObservable import IObservable
 
 '''
 XBOX BUTTON MAPPINGS:
@@ -26,9 +27,9 @@ back -> button 6
 
 D-Pad:
 up -> button 13
-down -> button 12
-left -> button 14
-right -> button 11
+down -> button 14
+left -> button 11
+right -> button 12
 
 Right Shoulder
 top -> button 5
@@ -39,9 +40,12 @@ top -> button 4
 bottom -> axis 2 (default -1; fully pressed 1)
 '''
 
-class XboxInput(IInputSource):
+
+class XboxInput(IInputSource, IObservable):
 
     def __init__(self, joystick_index=0, input_freq=10):
+        IInputSource.__init__(self)
+        IObservable.__init__(self)
         self.thread = None
         pygame.init()
         pygame.joystick.init()
@@ -69,7 +73,7 @@ class XboxInput(IInputSource):
             time.sleep(0.2)
             self._joystick.rumble(0, 0, 0)  # Stop rumbling
 
-    def _connect_controller(self,joystick_index=0):
+    def _connect_controller(self, joystick_index=0):
         """Connect to the specified joystick/controller.
         :returns True if connected successfully"""
         if pygame.joystick.get_count() > 0:
@@ -121,7 +125,8 @@ class XboxInput(IInputSource):
             car_commands = CarCommands()
             # Update throttle based on triggers
             forward_throttle = (self._joystick.get_axis(5) + 1) / 2  # Axis 5: RT, range [-1, 1], remapped to [0, 1]
-            backward_throttle = -((self._joystick.get_axis(2) + 1) / 2)  # Axis 2: LT, range [-1, 1], remapped to [-1, 0]
+            backward_throttle = -(
+                        (self._joystick.get_axis(2) + 1) / 2)  # Axis 2: LT, range [-1, 1], remapped to [-1, 0]
             car_commands.throttle = forward_throttle + backward_throttle  # Combine forward and backward throttle
 
             # Update steering based on the left joystick horizontal axis
@@ -130,11 +135,16 @@ class XboxInput(IInputSource):
             # Check for "Y" button press to activate a stop command
             car_commands.stop = self._joystick.get_button(3)  # Button 3: Y button
 
-            self.car_commands = car_commands
+            # Check for "DPad Up" button press to activate capturing process
+            car_commands.start_capture = bool(self._joystick.get_button(13))
 
+            # Check for "DPad Down" button press to stop capturing process
+            car_commands.stop_capture = bool(self._joystick.get_button(14))
+
+            self.car_commands = car_commands
+            self._notify_observers(self.car_commands.copy(), timestamp=time.time())
 
     def read_inputs(self) -> CarCommands:
         """Read inputs from the controller."""
         with self.lock:
             return self.car_commands.copy()  # Assuming CarCommands has a `copy` method
-

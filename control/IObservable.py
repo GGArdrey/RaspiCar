@@ -16,7 +16,7 @@ class IObservable:
         with self._observers_lock:
             self._observers.remove(observer)
 
-    def _notify_observers(self, data):
+    def _notify_observers(self, data, timestamp):
         with self._observers_lock:
             for observer in self._observers:
-                observer.update(data)
+                observer.update(data, timestamp)

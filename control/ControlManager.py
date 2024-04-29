@@ -65,10 +65,11 @@ class ControlManager:
 
         # Use control algorithm's steering value if input source's steering is zero, otherwise use input source's
         # steering
-        if input_commands.steer == 0.0:
-            merged_commands.steer = algorithm_commands.steer
-        else:
+        if input_commands.steer > 0.15 or input_commands.steer < -0.15:
             merged_commands.steer = input_commands.steer
+        else:
+            merged_commands.steer = algorithm_commands.steer
+
 
         return merged_commands
 
