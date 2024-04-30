@@ -60,7 +60,7 @@ class LaneDetectionHough(IControlAlgorithm, IObservable):
             img = self.denoise_frame(frame)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             img = self.detect_edges(img)
-            img = self.mask_region(img,FRAME_HEIGHT, FRAME_WIDTH)
+            img = self.mask_region(img)
             #self._notify_observers(img)
 
             left_lines, right_lines, road_center = self.detect_lines(img, FRAME_HEIGHT, FRAME_WIDTH)
@@ -98,20 +98,22 @@ class LaneDetectionHough(IControlAlgorithm, IObservable):
     def detect_edges(self, gray):
         return cv2.Canny(gray, 200, 150)
 
-    def mask_region(self, image, height, width):
+    def mask_region(self, image):
+        height, width = image.shape[:2]
         polygon = np.array([
-            [(0, height), (0, height // 3), (width, height // 3), (width, height)]
-        ])
-        mask = np.zeros_like(image)
-        mask = cv2.fillPoly(mask, polygon, 255)
-        mask = cv2.bitwise_and(image, mask)
-        return mask
+            [(0, int(height * 0.5)), (width, int(height * 0.5)), (width, height), (0, height)]
+        ], dtype=np.int32)  # Set the data type to int32 explicitly
+
+        mask = np.zeros_like(image, dtype=np.uint8)  # Ensure the mask is uint8
+        cv2.fillPoly(mask, [polygon], 255)  # Fill with white (255 for grayscale)
+        masked_image = cv2.bitwise_and(image, mask)
+        return masked_image
 
     def detect_lines(self, img, image_height, image_width):
         left_lines = []
         right_lines = []
-        left_x_bottom = []  # storing the intersect with the bottom of the image for all left lines
-        right_x_bottom = []  # storing the intersect with the bottom of the image for all right lines
+        left_x_bottom = []
+        right_x_bottom = []
         road_center = None
         lines = cv2.HoughLinesP(img, rho=3, theta=np.pi / 180, threshold=50, minLineLength=30, maxLineGap=5)
         if lines is None:
@@ -121,19 +123,23 @@ class LaneDetectionHough(IControlAlgorithm, IObservable):
             x1, y1, x2, y2 = line[0]
             theta = np.pi / 2 - np.arctan2(y2 - y1, x2 - x1)
 
-            # Calculate the x-coordinate of the intersection point with the bottom of the image
+            # Safe check for tan(theta) to avoid division by zero or undefined values
+            if np.isclose(np.tan(theta), 0):
+                intersect_x = x1  # If the line is vertical, use x1 as the intersection x-coordinate
+            else:
+                intersect_x = int(x1 + (image_height - y1) / np.tan(theta))
+
+            # Assign to right or left based on the direction of the line
             if np.cos(theta) > 0:
                 right_lines.append([x1, y1, x2, y2])
-                right_x_bottom.append(int(x1 + (image_height - y1) / np.tan(theta)))
+                right_x_bottom.append(intersect_x)
             else:
                 left_lines.append([x1, y1, x2, y2])
-                left_x_bottom.append(int(x1 + (image_height - y1) / np.tan(theta)))
+                left_x_bottom.append(intersect_x)
 
-            # Calculate the road center
+        # Calculate the road center from the bottom intersections
         if left_x_bottom and right_x_bottom:
             road_center = round((np.average(right_x_bottom) + np.average(left_x_bottom)) / 2)
-        else:
-            road_center = None
 
         return left_lines, right_lines, road_center
 

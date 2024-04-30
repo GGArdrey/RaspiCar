@@ -23,3 +23,9 @@ list-boards:
 # Open REPL session on Pi Pico through Raspberry Pi
 open-shell:
 	ssh pi@raspberrypi.local '/home/pi/.local/bin/rshell repl'
+
+copy:
+	scp -r pi@raspberrypi.local:/home/pi/data/* ./data/
+
+upload-model:
+	scp -r ./training/29-04-2024_22-37/checkpoints/cp-0129.keras pi@raspberrypi.local:/home/pi/models/

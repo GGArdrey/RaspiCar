@@ -137,9 +137,13 @@ class XboxInput(IInputSource, IObservable):
 
             # Check for "DPad Up" button press to activate capturing process
             car_commands.start_capture = bool(self._joystick.get_button(13))
+            if car_commands.start_capture:
+                self._rumble_controller()
 
             # Check for "DPad Down" button press to stop capturing process
             car_commands.stop_capture = bool(self._joystick.get_button(14))
+            if car_commands.stop_capture:
+                self._rumble_controller()
 
             self.car_commands = car_commands
             self._notify_observers(self.car_commands.copy(), timestamp=time.time())

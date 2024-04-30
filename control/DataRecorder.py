@@ -23,15 +23,18 @@ class DataRecorder(IObserver):
         self.new_data_event = threading.Event()  # Event to signal new data
         self.thread = None
         self.running = False
-        date_time_dir = datetime.now().strftime("%d-%m-%Y_%H-%M")
-        self.storage_dir = os.path.join(save_dir, date_time_dir)
-        os.makedirs(self.storage_dir, exist_ok=True)  # Ensure the directory exists
+        self.save_dir = save_dir
+        self.storage_dir = None
         self.image_count = 0
-        self.is_capturing = False  # Flag to control whether to save images
 
 
     def start(self):
         if not self.running:
+            # start by creating directory
+            date_time_dir = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+            self.storage_dir = os.path.join(self.save_dir, date_time_dir)
+            os.makedirs(self.storage_dir, exist_ok=True)  # Ensure the directory exists
+            self.image_count = 0  # reset counter
             self.running = True
             self.thread = threading.Thread(target=self.run)
             self.thread.start()
@@ -50,8 +53,7 @@ class DataRecorder(IObserver):
             self.new_data_event.wait()
             if not self.running:
                 break
-            if self.is_capturing:
-                self.process_data()
+            self.process_data()
             self.new_data_event.clear()
 
     def process_data(self):
@@ -75,18 +77,18 @@ class DataRecorder(IObserver):
             elif isinstance(data, CarCommands):  # Command data
                 self.latest_commands = data
                 self.latest_command_timestamp = timestamp
-                if data.start_capture and not self.is_capturing:
-                    self.is_capturing = True
+                if data.start_capture and not self.running:
+                    self.start()
                     print("Started Recording...")
-                if data.stop_capture and self.is_capturing:
+                if data.stop_capture and self.running:
                     print("Stopped Recording...")
-                    self.is_capturing = False
+                    self.stop()
             self.new_data_event.set()
 
 
     def save_frame_with_label(self, frame, commands):
         self.image_count += 1
-        filename = f"{self.image_count}_{commands.steer:.1f}.jpg"
+        filename = f"{self.image_count}_{commands.steer:.2f}.jpg"
         filepath = os.path.join(self.storage_dir, filename)
         cv2.imwrite(filepath, frame)
-        print(f"Saved {filename} with steering angle: {commands.steer:.1f}")
+        print(f"Saved {filename} with steering angle: {commands.steer:.2f}")

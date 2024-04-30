@@ -8,7 +8,7 @@ from util import timer
 from IObservable import IObservable
 import tensorflow as tf
 from PilotNet import PilotNet
-from tensorflow.keras.models import load_model
+
 
 
 class LaneDetectionPilotnet(IControlAlgorithm, IObservable):
@@ -33,7 +33,8 @@ class LaneDetectionPilotnet(IControlAlgorithm, IObservable):
     def load_model(self):
         #model = self.pilotnet.build_model()
         #return model.load_weights("/home/pi/models/cp-0091.ckpt")
-        return load_model("/home/pi/models/cp-0091.ckpt")
+        #return tf.keras.models.load_model('/home/pi/models/cp-0001.keras', custom_objects={'StandardizationLayer': StandardizationLayer})
+        return tf.keras.models.load_model('/home/pi/models/cp-0129.keras')
 
     def start(self):
         if not self.running:
@@ -69,7 +70,8 @@ class LaneDetectionPilotnet(IControlAlgorithm, IObservable):
     def process_frame(self, frame):
         with timer("LaneDetectionHough.process_frame Execution"):
             car_commands = CarCommands()
-            frame = self.pilotnet.scale_and_crop_image(frame)
+            #frame = self.pilotnet.bgr_to_hsv(frame)
+            frame = self.pilotnet.resize_and_crop_image(frame)
 
             input_tensor = tf.convert_to_tensor(frame)
             input_tensor = tf.expand_dims(input_tensor, 0)  # Create batch axis

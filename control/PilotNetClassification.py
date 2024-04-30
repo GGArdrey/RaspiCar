@@ -9,67 +9,101 @@ from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.layers import Conv2D, Flatten, Dense, Dropout, Input, Layer, Normalization
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
 from datetime import datetime
+from tensorflow.keras.utils import to_categorical
 import numpy as np
 
-
-
-
-
-class PilotNet:
+class PilotNetClassification:
     def __init__(self, data_dirs, save_dir):
-        self.target_width = 200
-        self.target_height = 66
-        self.batch_size = 64
         self.data_dirs = data_dirs
         date_time = datetime.now().strftime("%d-%m-%Y_%H-%M")
-        self.log_dir_base = os.path.join(save_dir, date_time, "log")
-        self.checkpoint_dir = os.path.join(save_dir, date_time, "checkpoints")
+        self.log_dir_base = save_dir + date_time + "/log"
+        self.checkpoint_dir = save_dir + date_time + "/checkpoints"
 
-    def resize_and_crop_image(self, image):
-        height, width = image.shape[:2]
-        scaling_factor = self.target_width / width
-        new_width = int(width * scaling_factor)
-        new_height = int(height * scaling_factor)
-        resized_image = cv2.resize(image, (new_width, new_height))
-        if new_height > self.target_height:
-            y_start = (new_height - self.target_height) // 2
-        else:
-            y_start = 0
-        cropped_image = resized_image[y_start:y_start + self.target_height, 0:self.target_width]
-        return cropped_image
+    def map_label_to_class(self, label):
+        boundaries = [-1.0, -0.66, -0.33, 0, 0.33, 0.66, 1.0]
+        for i, boundary in enumerate(boundaries):
+            if label <= boundary:
+                return i
+        return len(boundaries) - 1
 
-    def load_images_and_labels(self):
+    def load_dataset(self):
+        paths = []
         labels = []
-        images = []
         for dir in self.data_dirs:
             filenames = os.listdir(dir)
             for filename in filenames:
                 if filename.endswith('.jpg'):
-                    path = os.path.join(dir, filename)
-                    image = cv2.imread(path)
-                    if image is not None:
-                        image = self.resize_and_crop_image(image)
-                        images.append(image)
-                        labels.append(float(filename.split('_')[1].replace('.jpg', '')))
-        return np.array(images), np.array(labels)
-
-    def augment_image(self, image, label):
-        # Apply augmentation
-        image = tf.image.random_brightness(image, max_delta=0.1)  # Random brightness
-        return image, label
+                    paths.append(os.path.join(dir, filename))
+                    raw_label = float(filename.split('_')[1].replace('.jpg', ''))
+                    labels.append(self.map_label_to_class(raw_label))
+        return paths, labels
 
     def create_model_checkpoint(self):
+        # Define the checkpoint path using the .keras extension
         checkpoint_path = os.path.join(self.checkpoint_dir, "cp-{epoch:04d}.keras")
+
+        # Create a ModelCheckpoint callback that saves the full model
         checkpoint_callback = ModelCheckpoint(
             filepath=checkpoint_path,
             monitor='val_loss',
-            save_best_only=True,
-            save_weights_only=False,
+            save_best_only=False,  # Change this to False to save models at each epoch regardless of validation loss
+            save_weights_only=False,  # Save the full model, not just the weights
             verbose=1,
-            save_freq='epoch'
+            save_freq='epoch'  # Save the model at every epoch
         )
         return checkpoint_callback
 
+    def scale_and_crop_image(self, image, target_width=200, target_height=66):
+        height, width = image.shape[:2]
+        scaling_factor = target_width / width
+        new_width = int(width * scaling_factor)
+        new_height = int(height * scaling_factor)
+        resized_image = cv2.resize(image, (new_width, new_height))
+        if new_height > target_height:
+            y_start = new_height - target_height
+        else:
+            y_start = 0
+        cropped_image = resized_image[y_start:y_start + target_height, 0:target_width]
+        return cropped_image
+
+
+
+    def load_and_preprocess_images(self, image_paths):
+        images = []
+        for image_path in image_paths:
+            image = cv2.imread(image_path)
+            #image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
+            image = self.scale_and_crop_image(image)
+            images.append(image)
+        return np.array(images)
+
+    def create_generators(self, batch_size, train_paths, train_labels, test_paths, test_labels):
+        train_gen = ImageDataGenerator(
+            rotation_range=15,
+            shear_range=0.1,
+            zoom_range=0.2,
+            brightness_range=(0.8, 1.2),
+            fill_mode='nearest'
+        )
+        test_gen = ImageDataGenerator()
+
+        # Load and preprocess images
+        train_images = self.load_and_preprocess_images(train_paths)
+        test_images = self.load_and_preprocess_images(test_paths)
+
+        # Create the generators
+        train_generator = train_gen.flow(
+            train_images,
+            train_labels,
+            batch_size=batch_size
+        )
+        test_generator = test_gen.flow(
+            test_images,
+            test_labels,
+            batch_size=batch_size
+        )
+
+        return train_generator, test_generator
 
     def build_model(self):
         norm_layer = Normalization()
@@ -85,47 +119,31 @@ class PilotNet:
         x = Dense(100, activation="elu")(x)
         x = Dense(50, activation="elu")(x)
         x = Dense(10, activation="elu")(x)
-        output = Dense(1)(x)
+        output = Dense(7, activation='softmax')(x)
 
         model = Model(inputs=input_layer, outputs=output)
-
-        initial_learning_rate = 0.001
-        lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
-            initial_learning_rate=initial_learning_rate,
-            decay_steps=1000,
-            decay_rate=0.96,
-            staircase=True)
-        optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
-
-        # Compile the model with the defined optimizer
-        model.compile(optimizer=optimizer, loss='mse')
+        model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
         return model
 
-    def train(self, epochs=500):
-        images, labels = self.load_images_and_labels()
-
-        # Split data into train and validation sets
-        train_images, val_images, train_labels, val_labels = train_test_split(images, labels, test_size=0.2,
+    def train(self, batch_size=32, epochs=100):
+        paths, labels = self.load_dataset()
+        train_paths, test_paths, train_labels, test_labels = train_test_split(paths, labels, test_size=0.2,
                                                                               random_state=42)
-        print(f"Number of training samples: {len(train_images)}")
-        print(f"Number of validation samples: {len(val_images)}")
-
-        # Create training Dataset with augmentation
-        train_dataset = tf.data.Dataset.from_tensor_slices((train_images, train_labels))
-        train_dataset = train_dataset.map(self.augment_image).shuffle(1000).batch(self.batch_size).prefetch(tf.data.AUTOTUNE)
-
-        # Create validation Dataset without augmentation
-        val_dataset = tf.data.Dataset.from_tensor_slices((val_images, val_labels))
-        val_dataset = val_dataset.batch(self.batch_size).prefetch(tf.data.AUTOTUNE)
-
-        model = self.build_model()
-
-        # Now, you can use this `dataset` directly in your model training
-        tensorboard_callback = TensorBoard(log_dir=self.log_dir_base, histogram_freq=1)
+        train_labels = to_categorical(train_labels, num_classes=7)
+        test_labels = to_categorical(test_labels, num_classes=7)
         checkpoint_callback = self.create_model_checkpoint()
+        train_generator, test_generator = self.create_generators(batch_size, train_paths, train_labels, test_paths,
+                                                                 test_labels)
+        model = self.build_model()
+        tensorboard_callback = TensorBoard(log_dir=self.log_dir_base, histogram_freq=1)
 
-        model.fit(train_dataset, validation_data = val_dataset, epochs=epochs, callbacks=[tensorboard_callback,checkpoint_callback])
-
+        epochs = 100
+        history = model.fit(
+            train_generator,
+            epochs=epochs,
+            validation_data=test_generator,
+            callbacks=[tensorboard_callback, checkpoint_callback]
+        )
 
 
 # Example usage
@@ -177,5 +195,5 @@ if __name__ == '__main__':
 
 
 
-    pilot_net = PilotNet(data_dirs=data_dirs, save_dir="/home/luca/raspicar/training/")
+    pilot_net = PilotNetClassification(data_dirs=data_dirs, save_dir="/home/luca/raspicar/training/")
     pilot_net.train()

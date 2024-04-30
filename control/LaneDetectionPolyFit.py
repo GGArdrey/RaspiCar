@@ -9,6 +9,8 @@ from util import timer
 from IObservable import IObservable
 
 
+
+
 class LaneDetectionPolyfit(IControlAlgorithm, IObservable):
 
     def __init__(self):
@@ -60,8 +62,7 @@ class LaneDetectionPolyfit(IControlAlgorithm, IObservable):
             img = self.denoise_frame(frame)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             img = self.detect_edges(img)
-            FRAME_WIDTH, FRAME_HEIGHT = img.shape
-            img = self.mask_region(img,FRAME_HEIGHT, FRAME_WIDTH)
+            img = self.mask_region(img)
 
             FRAME_WIDTH, FRAME_HEIGHT = img.shape
             left_lines, right_lines, road_center = self.detect_curves(img, FRAME_HEIGHT, FRAME_WIDTH)
@@ -99,18 +100,14 @@ class LaneDetectionPolyfit(IControlAlgorithm, IObservable):
     def detect_edges(self, gray):
         return cv2.Canny(gray, 200, 150)
 
-    def mask_region(self, image, height, width): #TODO height and width are wrong!?
-        # Coordinates for the polygon covering the bottom half of the image
-        #height, width = image.shape
+    def mask_region(self, image):
+        height, width = image.shape[:2]
         polygon = np.array([
-            [(0, int(height*0.7)), (width, int(height*0.7)), (width, height), (0, height)]
-        ])
-        # Create a mask the same size as the image, initially black
-        mask = np.zeros_like(image)
-        # Fill the polygon area with white
-        cv2.fillPoly(mask, [polygon], 255)
+            [(0, int(height * 0.5)), (width, int(height * 0.5)), (width, height), (0, height)]
+        ], dtype=np.int32)  # Set the data type to int32 explicitly
 
-        # Apply the mask using bitwise AND to retain the bottom half
+        mask = np.zeros_like(image, dtype=np.uint8)  # Ensure the mask is uint8
+        cv2.fillPoly(mask, [polygon], 255)  # Fill with white (255 for grayscale)
         masked_image = cv2.bitwise_and(image, mask)
         return masked_image
 

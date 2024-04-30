@@ -3,7 +3,6 @@ import struct
 
 import cv2
 import threading
-from pynput import keyboard
 import numpy as np
 
 class Client:
@@ -33,17 +32,17 @@ class Client:
         self.client_socket.close()
         print("Client shut down.")
 
-    def send_keyboard_input(self):
-        def on_press(key):
-            try:
-                key_data = str(key).encode()
-                self.client_socket.sendall(key_data)
-            except Exception as e:
-                print(f"Error sending keyboard input: {e}")
-
-        listener = keyboard.Listener(on_press=on_press)
-        listener.start()
-        listener.join()
+    # def send_keyboard_input(self):
+    #     def on_press(key):
+    #         try:
+    #             key_data = str(key).encode()
+    #             self.client_socket.sendall(key_data)
+    #         except Exception as e:
+    #             print(f"Error sending keyboard input: {e}")
+    #
+    #     listener = keyboard.Listener(on_press=on_press)
+    #     listener.start()
+    #     listener.join()
 
     def receive_video_stream(self):
         data = b""
