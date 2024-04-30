@@ -1,4 +1,4 @@
-<mxfile host="app.diagrams.net" modified="2024-04-30T12:31:35.589Z" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" etag="cNZ23_GIre_R_HaPncSK" version="24.3.1" type="github" pages="3">
+<mxfile host="app.diagrams.net" modified="2024-04-30T12:34:57.303Z" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" etag="Ab2eBW90PgXVENrZgmDs" version="24.3.1" type="github" pages="3">
   <diagram name="Pico Class Diagram" id="929967ad-93f9-6ef4-fab6-5d389245f69c">
     <mxGraphModel dx="3115.5" dy="759" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1.5" pageWidth="1169" pageHeight="826" background="none" math="0" shadow="0">
       <root>
@@ -568,7 +568,7 @@
     </mxGraphModel>
   </diagram>
   <diagram id="GAO0HSCDCvyEg1KmRltW" name="car_schematics">
-    <mxGraphModel dx="1135" dy="633" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel dx="1946" dy="1084" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -714,6 +714,9 @@
             <mxGeometry x="465" y="630" width="210" height="50" as="geometry" />
           </mxCell>
         </UserObject>
+        <mxCell id="cTKGFzSNopphtYQ6RcUC-44" value="&lt;font style=&quot;font-size: 48px;&quot;&gt;*nothing in scale!!!&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="130" y="490" width="300" height="140" as="geometry" />
+        </mxCell>
       </root>
     </mxGraphModel>
   </diagram>
