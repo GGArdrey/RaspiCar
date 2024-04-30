@@ -1,5 +1,5 @@
 
-import serial
+
 class DummyCommandInterface:
     def __init__(self):
         pass

@@ -34,8 +34,11 @@ class ControlManager:
     def run(self):
         while True:
             time.sleep(0.1) # TODO this is used to prevent UART communication failures if too fast
+            # TODO: also make this more readable and structured in general
             # Process input source
-            input_commands = self._input_source.read_inputs()
+            input_commands = None
+            if self._input_source is not None:
+                input_commands = self._input_source.read_inputs()
 
             #print("Input commands:", input_commands.throttle, input_commands.steer, input_commands.stop)
             if self._control_algorithm is None:

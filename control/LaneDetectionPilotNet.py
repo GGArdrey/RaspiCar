@@ -34,7 +34,7 @@ class LaneDetectionPilotnet(IControlAlgorithm, IObservable):
         #model = self.pilotnet.build_model()
         #return model.load_weights("/home/pi/models/cp-0091.ckpt")
         #return tf.keras.models.load_model('/home/pi/models/cp-0001.keras', custom_objects={'StandardizationLayer': StandardizationLayer})
-        return tf.keras.models.load_model('/home/pi/models/cp-0129.keras')
+        return tf.keras.models.load_model('/home/pi/models/cp-0025.keras')
 
     def start(self):
         if not self.running:
@@ -68,45 +68,21 @@ class LaneDetectionPilotnet(IControlAlgorithm, IObservable):
             self.process_frame(frame)
 
     def process_frame(self, frame):
-        with timer("LaneDetectionHough.process_frame Execution"):
-            car_commands = CarCommands()
-            #frame = self.pilotnet.bgr_to_hsv(frame)
-            frame = self.pilotnet.resize_and_crop_image(frame)
+        car_commands = CarCommands()
+        #frame = self.pilotnet.bgr_to_hsv(frame)
+        frame = self.pilotnet.resize_and_crop_image(frame)
 
-            input_tensor = tf.convert_to_tensor(frame)
-            input_tensor = tf.expand_dims(input_tensor, 0)  # Create batch axis
+        input_tensor = tf.convert_to_tensor(frame)
+        input_tensor = tf.expand_dims(input_tensor, 0)  # Create batch axis
+        with timer("Inference Time"):
             prediction = self.model.predict(input_tensor)[0][0]
-            print("Prediction: ", prediction)
-            car_commands.steer = float(prediction)
+        print("Prediction: ", prediction)
+        car_commands.steer = float(prediction)
 
 
-            with self.lock:
-                self.car_commands = car_commands
-            self._notify_observers(frame,timestamp = time.time())
+        with self.lock:
+            self.car_commands = car_commands
+        self._notify_observers(frame,timestamp = time.time())
 
-    import cv2
-
-    def scale_and_crop(self, frame, target_width=200, target_height=66):
-        # Step 1: Determine the scaling factor
-        # Calculate the ratio of the target dimensions to the current dimensions
-        height, width = frame.shape[:2]
-        scaling_factor = target_width / width
-
-        # Step 2: Resize the image to maintain aspect ratio
-        new_width = int(width * scaling_factor)
-        new_height = int(height * scaling_factor)
-        resized_frame = cv2.resize(frame, (new_width, new_height))
-
-        # Step 3: Crop the resized image to the target dimensions
-        # Calculate the starting y-coordinate of the crop (bottom part)
-        if new_height > target_height:
-            y_start = new_height - target_height
-        else:
-            y_start = 0
-
-        # Perform the crop
-        cropped_frame = resized_frame[y_start:y_start + target_height, 0:target_width]
-
-        return cropped_frame
 
 

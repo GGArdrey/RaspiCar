@@ -71,5 +71,5 @@ class Client:
         cv2.destroyAllWindows()
 
 if __name__ == '__main__':
-    app = Client()
-    app.start()
+    client = Client()
+    client.start()

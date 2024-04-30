@@ -28,4 +28,4 @@ copy:
 	scp -r pi@raspberrypi.local:/home/pi/data/* ./data/
 
 upload-model:
-	scp -r ./training/29-04-2024_22-37/checkpoints/cp-0129.keras pi@raspberrypi.local:/home/pi/models/
+	scp -r ./training/30-04-2024_18-46/checkpoints/cp-0025.keras pi@raspberrypi.local:/home/pi/models/

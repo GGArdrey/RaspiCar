@@ -7,7 +7,7 @@ from IControlAlgorithm import IControlAlgorithm
 import threading
 from util import timer
 from IObservable import IObservable
-
+from sklearn.cluster import KMeans
 
 
 
@@ -56,13 +56,14 @@ class LaneDetectionPolyfit(IControlAlgorithm, IObservable):
 
     def process_frame(self, frame):
         with timer("LaneDetectionHough.process_frame Execution"):
-            FRAME_WIDTH, FRAME_HEIGHT, _ = frame.shape
+
+
             car_commands = CarCommands()
 
-            img = self.denoise_frame(frame)
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            img_color = self.resize_and_crop_image(frame)
+            img = cv2.cvtColor(img_color, cv2.COLOR_BGR2GRAY)  # TODO what is faster - doing this first or cropping?
+            img = self.denoise_frame(img)
             img = self.detect_edges(img)
-            img = self.mask_region(img)
 
             FRAME_WIDTH, FRAME_HEIGHT = img.shape
             left_lines, right_lines, road_center = self.detect_curves(img, FRAME_HEIGHT, FRAME_WIDTH)
@@ -76,16 +77,17 @@ class LaneDetectionPolyfit(IControlAlgorithm, IObservable):
             with self.lock:
                 self.car_commands = car_commands
             # print("roadcenter", road_center)
-            frame = self.visualize_curves(frame, left_lines, right_lines, FRAME_HEIGHT)
-            frame = self.visualize_center(frame, road_center, FRAME_HEIGHT)
+            img_color = self.visualize_curves(img_color, left_lines, right_lines, FRAME_HEIGHT)
+            img_color = self.visualize_center(img_color, road_center, FRAME_HEIGHT)
 
             img_canny_color = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-            blended_frame = cv2.addWeighted(img_canny_color, 1, frame, 1, 0)
+            blended_frame = cv2.addWeighted(img_canny_color, 1, img_color, 1, 0)
             self._notify_observers(blended_frame,timestamp = time.time())
 
     def read_inputs(self):
         with self.lock:
             return self.car_commands.copy()
+
 
     def denoise_frame(self, frame):
         denoised = cv2.GaussianBlur(frame, (3, 3), 1)
@@ -111,38 +113,39 @@ class LaneDetectionPolyfit(IControlAlgorithm, IObservable):
         masked_image = cv2.bitwise_and(image, mask)
         return masked_image
 
+    import numpy as np
+    from sklearn.cluster import KMeans
 
     def detect_curves(self, img, image_height, image_width):
-        # Convert image to binary if not already
-        #_, binary_img = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY)
-
         # Find all non-zero points in the image
         points = cv2.findNonZero(img)
         if points is not None:
-            # Separate points into left and right based on x-coordinate
-            mid_x = image_width // 2
-            left_points = points[points[:, 0, 0] < mid_x]
-            right_points = points[points[:, 0, 0] >= mid_x]
+            # Use KMeans to cluster points into two clusters (left and right lanes)
+            kmeans = KMeans(n_clusters=2, random_state=0).fit(points[:, 0, :])
+            labels = kmeans.labels_
+            cluster_0 = points[labels == 0]
+            cluster_1 = points[labels == 1]
+
+            # Sort clusters by x-coordinate of their centroid to identify left and right
+            centroid_0_x = kmeans.cluster_centers_[0, 0]
+            centroid_1_x = kmeans.cluster_centers_[1, 0]
+            left_points, right_points = (cluster_0, cluster_1) if centroid_0_x < centroid_1_x else (
+            cluster_1, cluster_0)
 
             # Fit polynomials if enough points are detected
-            if left_points.shape[0] > 20:
+            left_curve = right_curve = None
+            if left_points.shape[0] > 10:
                 left_curve = np.polyfit(left_points[:, 0, 1], left_points[:, 0, 0], 2)
-            else:
-                left_curve = None
-
-            if right_points.shape[0] > 20:
+            if right_points.shape[0] > 10:
                 right_curve = np.polyfit(right_points[:, 0, 1], right_points[:, 0, 0], 2)
-            else:
-                right_curve = None
 
             # Calculate road center at the bottom of the image using the average of the x-coordinates of the polynomial fits
-            y_eval = image_height
+            road_center = None
             if left_curve is not None and right_curve is not None:
+                y_eval = image_height
                 left_x_bottom = np.polyval(left_curve, y_eval)
                 right_x_bottom = np.polyval(right_curve, y_eval)
                 road_center = (left_x_bottom + right_x_bottom) / 2
-            else:
-                road_center = None
 
             return left_curve, right_curve, road_center
 

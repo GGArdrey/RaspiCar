@@ -11,13 +11,13 @@ sys.path.append(package_dir)
 from XboxInput import XboxInput
 from LaneDetectionHough import LaneDetectionHough
 from LaneDetectionPilotNet import LaneDetectionPilotnet
-from ControlManager import ControlManager
-from CommandInterface import CommandInterface
 from RPiServer import RPiServer
 from CameraCapture import CameraCapture
 from LaneDetectionPolyFit import LaneDetectionPolyfit
 from DataRecorder import DataRecorder
-
+from DummyCommandInterface import DummyCommandInterface
+from ControlManager import ControlManager
+from CommandInterface import CommandInterface
 
 def capture():
     recorder = DataRecorder()
@@ -40,15 +40,13 @@ def drivePilotNet():
     xbox_input = XboxInput()
     xbox_input.start()  # Start the input polling thread
 
-    #server = RPiServer()
+    server = RPiServer()
 
-
-    # lane_detector = LaneDetectionHough()
     lane_detector = LaneDetectionPilotnet()
-    #lane_detector.register_observer(server)
+    lane_detector.register_observer(server)
     lane_detector.start()  # Begin processing frames thread
 
-    #server.start()  # starting acceting and sending thread inside server
+    server.start()  # starting acceting and sending thread inside server
 
     camera = CameraCapture(frame_width=640, frame_height=360)
     #camera.register_observer(server)
@@ -82,6 +80,25 @@ def driveLaneDetection():
     control_manager = ControlManager(command_interface, xbox_input, lane_detector)
     control_manager.start()  # start thread
 
+def testLaneDetectionDesktop():
+
+
+    server = RPiServer()
+    server.start()  # starting acceting and sending thread inside server
+
+
+    #lane_detector = LaneDetectionHough()
+    lane_detector = LaneDetectionPolyfit()
+    lane_detector.register_observer(server)
+    lane_detector.start()  # Begin processing frames thread
+
+    camera = CameraCapture(frame_width=640, frame_height=360,camera_source=2)
+    camera.register_observer(lane_detector)
+    camera.start()  # Start capturing frames and sending it to observers thread
+
+
 if __name__ == "__main__":
     #capture()
-    drivePilotNet()
+    #testLaneDetectionDesktop()
+    #drivePilotNet()
+    driveLaneDetection()

@@ -1,4 +1,5 @@
 import os
+import sys
 
 import cv2
 import tensorflow as tf
@@ -20,22 +21,36 @@ class PilotNet:
         self.target_width = 200
         self.target_height = 66
         self.batch_size = 64
+        self.epochs = 10
         self.data_dirs = data_dirs
         date_time = datetime.now().strftime("%d-%m-%Y_%H-%M")
-        self.log_dir_base = os.path.join(save_dir, date_time, "log")
+        self.log_dir_base = os.path.join(save_dir, date_time, "log/")
+        if not os.path.exists(self.log_dir_base):
+            os.makedirs(self.log_dir_base)
         self.checkpoint_dir = os.path.join(save_dir, date_time, "checkpoints")
 
-    def resize_and_crop_image(self, image):
+    def resize_and_crop_image(self, image, target_width=200, target_height=66):
+        # Check input image dimensions
+        if len(image.shape) < 2:
+            raise ValueError("Invalid image data!")
+
         height, width = image.shape[:2]
-        scaling_factor = self.target_width / width
+
+        # Calculate scaling factor to maintain aspect ratio based on width
+        scaling_factor = target_width / width
         new_width = int(width * scaling_factor)
         new_height = int(height * scaling_factor)
         resized_image = cv2.resize(image, (new_width, new_height))
-        if new_height > self.target_height:
-            y_start = (new_height - self.target_height) // 2
-        else:
-            y_start = 0
-        cropped_image = resized_image[y_start:y_start + self.target_height, 0:self.target_width]
+
+        # Check if the new height is greater than or equal to the target height before cropping
+        if new_height < target_height:
+            raise ValueError("Resized image height is less than the target crop height.")
+
+        # Calculate start y-coordinate for cropping to center the crop area
+        y_start = new_height - target_height
+
+        cropped_image = resized_image[y_start:y_start + target_height, 0:target_width]
+        #cropped_image = cv2.cvtColor(cropped_image, cv2.COLOR_BGR2HSV)
         return cropped_image
 
     def load_images_and_labels(self):
@@ -63,7 +78,7 @@ class PilotNet:
         checkpoint_callback = ModelCheckpoint(
             filepath=checkpoint_path,
             monitor='val_loss',
-            save_best_only=True,
+            save_best_only=False,
             save_weights_only=False,
             verbose=1,
             save_freq='epoch'
@@ -76,14 +91,16 @@ class PilotNet:
         input_layer = Input(shape=(66, 200, 3))
         x = norm_layer(input_layer)
         x = Conv2D(24, (5, 5), strides=(2, 2), activation="elu")(x)
+        x = Dropout(0.2)(x)
         x = Conv2D(36, (5, 5), strides=(2, 2), activation="elu")(x)
-        x = Dropout(0.1)(x)
         x = Conv2D(48, (5, 5), strides=(2, 2), activation="elu")(x)
         x = Conv2D(64, (3, 3), activation="elu")(x)
+        x = Dropout(0.2)(x)
+        x = Conv2D(64, (3, 3), activation="elu")(x)
         x = Flatten()(x)
-        x = Dropout(0.1)(x)
         x = Dense(100, activation="elu")(x)
         x = Dense(50, activation="elu")(x)
+        x = Dropout(0.2)(x)
         x = Dense(10, activation="elu")(x)
         output = Dense(1)(x)
 
@@ -98,25 +115,37 @@ class PilotNet:
         optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
 
         # Compile the model with the defined optimizer
-        model.compile(optimizer=optimizer, loss='mse')
+        model.compile(optimizer=optimizer, loss='mse', metrics=['mae', tf.keras.metrics.RootMeanSquaredError(name='rmse')])
         return model
 
-    def train(self, epochs=500):
+    def train(self):
         images, labels = self.load_images_and_labels()
 
-        # Split data into train and validation sets
-        train_images, val_images, train_labels, val_labels = train_test_split(images, labels, test_size=0.2,
-                                                                              random_state=42)
+        # Split data into train+val and test sets
+        train_val_images, test_images, train_val_labels, test_labels = train_test_split(
+            images, labels, test_size=0.1, random_state=42
+        )
+
+        # Split train+val into train and validation sets
+        train_images, val_images, train_labels, val_labels = train_test_split(
+            train_val_images, train_val_labels, test_size=0.2, random_state=42
+        )
+
         print(f"Number of training samples: {len(train_images)}")
         print(f"Number of validation samples: {len(val_images)}")
+        print(f"Number of testing samples: {len(test_images)}")
 
-        # Create training Dataset with augmentation
         train_dataset = tf.data.Dataset.from_tensor_slices((train_images, train_labels))
-        train_dataset = train_dataset.map(self.augment_image).shuffle(1000).batch(self.batch_size).prefetch(tf.data.AUTOTUNE)
+        train_dataset = train_dataset.map(self.augment_image).shuffle(1000).batch(self.batch_size).prefetch(
+            tf.data.AUTOTUNE)
 
         # Create validation Dataset without augmentation
         val_dataset = tf.data.Dataset.from_tensor_slices((val_images, val_labels))
         val_dataset = val_dataset.batch(self.batch_size).prefetch(tf.data.AUTOTUNE)
+
+        # Create test Dataset without augmentation
+        test_dataset = tf.data.Dataset.from_tensor_slices((test_images, test_labels))
+        test_dataset = test_dataset.batch(self.batch_size).prefetch(tf.data.AUTOTUNE)
 
         model = self.build_model()
 
@@ -124,7 +153,146 @@ class PilotNet:
         tensorboard_callback = TensorBoard(log_dir=self.log_dir_base, histogram_freq=1)
         checkpoint_callback = self.create_model_checkpoint()
 
-        model.fit(train_dataset, validation_data = val_dataset, epochs=epochs, callbacks=[tensorboard_callback,checkpoint_callback])
+        self.write_log_pre_training(model, labels, train_images,val_images, test_images,train_labels,val_labels,test_labels)
+
+        model.fit(train_dataset, validation_data = val_dataset, epochs=self.epochs, callbacks=[tensorboard_callback,checkpoint_callback])
+
+        results = model.evaluate(test_dataset)
+        print(f"Test MSE: {results[0]}, Test MAE: {results[1]}, Test RMSE: {results[2]}")
+        self.write_log_post_training(model, test_dataset, test_images, test_labels)
+
+
+
+    def write_log_pre_training(self, model, labels, train_images, val_images, test_images, train_labels, val_labels, test_labels):
+        '''
+        Write a log before training with details to the data, data distribution plots and architecture
+        :param model:
+        :param train_images:
+        :param val_images:
+        :param test_images:
+        :param train_labels:
+        :param val_labels:
+        :param test_labels:
+        :return:
+        '''
+        with open(self.log_dir_base+"info.txt", 'a') as log:
+            model.summary(print_fn=lambda x: log.write(x + '\n'))
+            log.write(f"Epochs: {self.epochs}\n")
+            log.write(f"Batchsize: {self.batch_size}\n\n")
+            log.write(f"Data Sets Used: {self.data_dirs}\n\n")
+
+
+            mean_angle, variance_angle = self.create_data_distribution_graph(labels, "Distribution of Steering Angles for Complete Data")
+            log.write("\nDistribution of Steering Angles for Complete Data\n")
+            log.write(f"Number of Images: {len(labels)}\n")
+            log.write(f"Mean of Steering Angles: {mean_angle:.2f}\n")
+            log.write(f"Variance of Steering Angles: {variance_angle:.2f}\n")
+
+
+            mean_angle, variance_angle = self.create_data_distribution_graph(train_labels,"Distribution of Steering Angles for Training Data")
+            log.write("\nDistribution of Steering Angles for Training Data\n")
+            log.write(f"Number of Images: {len(train_labels)}\n")
+            log.write(f"Mean of Steering Angles: {mean_angle:.2f}\n")
+            log.write(f"Variance of Steering Angles: {variance_angle:.2f}\n")
+
+
+            mean_angle, variance_angle = self.create_data_distribution_graph(val_labels, "Distribution of Steering Angles for Validation Data")
+            log.write("\nDistribution of Steering Angles for Validation Data\n")
+            log.write(f"Number of Images: {len(val_labels)}\n")
+            log.write(f"Mean of Steering Angles: {mean_angle:.2f}\n")
+            log.write(f"Variance of Steering Angles: {variance_angle:.2f}\n")
+
+
+            mean_angle, variance_angle = self.create_data_distribution_graph(test_labels, "Distribution of Steering Angles for Test Data")
+            log.write("\nDistribution of Steering Angles for Test Data\n")
+            log.write(f"Number of Images: {len(test_labels)}\n")
+            log.write(f"Mean of Steering Angles: {mean_angle:.2f}\n")
+            log.write(f"Variance of Steering Angles: {variance_angle:.2f}\n")
+
+    def create_data_distribution_graph(self, labels, title='Distribution of Steering Angles',bins=21):
+        import matplotlib.pyplot as plt
+        """
+        Plots the distribution of steering angles.
+
+        Args:
+        - angles (list or numpy array): The list or array containing the steering angles.
+        - bins (int): Number of bins in the histogram.
+
+        """
+
+        # Calculating statistics
+        mean_angle = np.mean(labels)
+        variance_angle = np.var(labels)
+
+        # Printing statistics
+        print("Number of Images: ", len(labels))
+        print(f"Mean of Steering Angles: {mean_angle:.2f}")
+        print(f"Variance of Steering Angles: {variance_angle:.2f}")
+
+        plt.figure(figsize=(10, 6))
+        counts, bin_edges, _ = plt.hist(labels, bins=bins, alpha=0.7, color='blue')
+        plt.title(title)
+        plt.xlabel('Steering Angle')
+        plt.ylabel('Frequency')
+        plt.grid(True)
+
+        # Adding text labels above bars
+        bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])  # Calculate bin centers
+        for count, x in zip(counts, bin_centers):
+            # Only put text above bars with counts more than 0
+            if count > 0:
+                plt.text(x, count, str(int(count)), ha='center', va='bottom')
+
+        plt.savefig(self.log_dir_base + title + ".svg")
+        #plt.show()
+        return mean_angle, variance_angle
+
+    def write_log_post_training(self, model, test_dataset, test_images, test_labels):
+        '''
+        Append information to the log after training regarding evaluation metrics and a prediction vs ground truth plot
+        :param model:
+        :param test_images:
+        :param test_labels:
+        :return:
+        '''
+        results = model.evaluate(test_dataset)
+        with open(self.log_dir_base + "info.txt", 'a') as log:
+            log.write("\n\nResults For Evaluation with Test Set:\n")
+            log.write(f"Test MSE: {results[0]}, Test MAE: {results[1]}, Test RMSE: {results[2]}\n")
+
+        self.create_evaluation_plots(model, test_images, test_labels)
+
+    def create_evaluation_plots(self, model, test_images, test_labels):
+        '''
+        Plots prediction vs ground truth with test data on trained model
+        :param model:
+        :param test_images:
+        :param test_labels:
+        :return:
+        '''
+        import matplotlib.pyplot as plt
+        predictions = model.predict(test_images)
+        predictions = predictions.flatten()
+
+        plt.figure(figsize=(10, 10))
+        plt.scatter(test_labels, predictions)
+        plt.xlabel('Actual Values')
+        plt.ylabel('Predicted Values')
+        plt.title('Actual vs Predicted Values')
+        plt.axis('equal')  # This sets the same scale for both axes
+        plt.grid(True)
+        plt.savefig(self.log_dir_base + "Actual vs Predicted Values.svg")
+
+        # Optionally, plot the residuals
+        plt.figure(figsize=(10, 10))
+        plt.scatter(test_labels, test_labels - predictions)
+        plt.xlabel('Actual Values')
+        plt.ylabel('Residuals')
+        plt.title('Residuals of Predictions')
+        plt.axhline(y=0, color='red', linestyle='--')
+        plt.axis('equal')  # This sets the same scale for both axes
+        plt.grid(True)  # Optionally, add a grid for easier visualization
+        plt.savefig(self.log_dir_base + "Residuals of Predictions")
 
 
 
@@ -172,8 +340,13 @@ if __name__ == '__main__':
                  "/home/luca/raspicar/data/29-04-2024_16-24-28",
                  "/home/luca/raspicar/data/29-04-2024_16-25-28",
                  "/home/luca/raspicar/data/29-04-2024_16-26-16",
-                 "/home/luca/raspicar/data/29-04-2024_16-27-14"
-                 ]
+                 "/home/luca/raspicar/data/29-04-2024_16-27-14",
+                 "/home/luca/raspicar/data/30-04-2024_13-44-21",
+                 "/home/luca/raspicar/data/30-04-2024_13-45-32",
+                 "/home/luca/raspicar/data/30-04-2024_13-47-07",
+                 "/home/luca/raspicar/data/30-04-2024_13-48-12",
+                 "/home/luca/raspicar/data/30-04-2024_13-49-53",
+                 "/home/luca/raspicar/data/30-04-2024_13-50-31"]
 
 
 
