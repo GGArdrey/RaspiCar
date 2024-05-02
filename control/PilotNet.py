@@ -21,7 +21,7 @@ class PilotNet:
         self.target_width = 200
         self.target_height = 66
         self.batch_size = 64
-        self.epochs = 10
+        self.epochs = 25
         self.data_dirs = data_dirs
         date_time = datetime.now().strftime("%d-%m-%Y_%H-%M")
         self.log_dir_base = os.path.join(save_dir, date_time, "log/")
@@ -156,6 +156,15 @@ class PilotNet:
         self.write_log_pre_training(model, labels, train_images,val_images, test_images,train_labels,val_labels,test_labels)
 
         model.fit(train_dataset, validation_data = val_dataset, epochs=self.epochs, callbacks=[tensorboard_callback,checkpoint_callback])
+
+        # Now convert the last/best model to tf lite
+        converter = tf.lite.TFLiteConverter.from_keras_model(model)
+        converter.optimizations = [tf.lite.Optimize.DEFAULT]
+        converter.target_spec.supported_types = [tf.float16] #TODO maybe change optimization
+        tflite_model = converter.convert()
+        # Save the model.
+        with open(self.checkpoint_dir + '/model.tflite', 'wb') as f:
+            f.write(tflite_model)
 
         results = model.evaluate(test_dataset)
         print(f"Test MSE: {results[0]}, Test MAE: {results[1]}, Test RMSE: {results[2]}")

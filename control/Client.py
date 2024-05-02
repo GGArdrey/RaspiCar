@@ -28,7 +28,6 @@ class Client:
 
         #keyboard_thread.join()
         video_thread.join()
-
         self.client_socket.close()
         print("Client shut down.")
 
