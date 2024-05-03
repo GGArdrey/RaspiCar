@@ -70,5 +70,5 @@ class Client:
         cv2.destroyAllWindows()
 
 if __name__ == '__main__':
-    client = Client(server_host="127.0.0.1")
+    client = Client()
     client.start()

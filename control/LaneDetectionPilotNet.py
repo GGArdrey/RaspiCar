@@ -26,7 +26,7 @@ class LaneDetectionPilotnet(IControlAlgorithm, IObservable):
         self.pilotnet = PilotNet("","")
         #self.model = self.load_model()
 
-        self.interpreter = Interpreter(model_path="/home/pi/models/model.tflite")
+        self.interpreter = Interpreter(model_path="/home/pi/models/cp-0010.tflite")
         self.interpreter.allocate_tensors()
         # Get input and output details
         self.input_details = self.interpreter.get_input_details()
@@ -75,7 +75,7 @@ class LaneDetectionPilotnet(IControlAlgorithm, IObservable):
                     print("Received None Frame inside LaneDetectionTransform. Exit Thread...")
                     break  # Allow using None as a shutdown signal
 
-            self.process_frame_coral(frame)
+            self.process_frame_coral_classification(frame)
 
     def process_frame(self, frame):
         car_commands = CarCommands()
@@ -116,4 +116,33 @@ class LaneDetectionPilotnet(IControlAlgorithm, IObservable):
         self._notify_observers(frame, timestamp=time.time())
 
 
+    def process_frame_coral_classification(self, frame):
+        classes = [-1.0,  -0.8, -0.6, -0.4, -0.2, 0, 0.2, 0.4, 0.6,  0.8, 1.0]
+        car_commands = CarCommands()
+
+        # Assuming resize_and_crop_image function processes the frame as needed for the model
+        frame = self.pilotnet.resize_and_crop_image(frame)
+
+        # Prepare the frame for the model (make sure the datatype matches what the model expects)
+        frame = np.array(frame, dtype=np.float32)
+        self.interpreter.set_tensor(self.input_details[0]['index'], [frame])
+
+        with timer("Inference Time"):
+            self.interpreter.invoke()
+            predictions = self.interpreter.get_tensor(self.output_details[0]['index'])[0]
+
+        # Use argmax to find the most likely class label
+        predicted_class = np.argmax(predictions)
+        print("Predictions:")
+        for i, pred in enumerate(predictions):
+            print(f"  {classes[i]}: {pred * 100:.2f}%")
+
+        # Print the predicted class
+        print(f"Predicted Class: {classes[predicted_class]}")
+
+        car_commands.steer = classes[predicted_class]  # Assuming steer is now used to represent the predicted class
+
+        with self.lock:
+            self.car_commands = car_commands
+        self._notify_observers(frame, timestamp=time.time())
 

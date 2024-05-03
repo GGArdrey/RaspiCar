@@ -26,6 +26,8 @@ class LaneDetectionPolyfit(IControlAlgorithm, IObservable):
         # Initialize two Kalman Filters
         self.kf_left_lane = self.initialize_kalman()
         self.kf_right_lane = self.initialize_kalman()
+        self.right_lane_prediction_counter = 0 #counts how often kalman was used back-to-back to predict right lane
+        self.left_lane_prediction_counter = 0
 
     def start(self):
         if not self.running:
@@ -146,6 +148,9 @@ class LaneDetectionPolyfit(IControlAlgorithm, IObservable):
         return clusters, labels
 
     def fit_polynomials(self, clusters):
+        if clusters is None:
+            return None,None,None
+
         curve_mse_pairs = []
 
         for cluster in clusters:
@@ -160,6 +165,8 @@ class LaneDetectionPolyfit(IControlAlgorithm, IObservable):
 
         # Sort curve-MSE pairs by MSE (the second item in each tuple)
         sorted_curve_mse_pairs = sorted(curve_mse_pairs, key=lambda x: x[1])
+        if not sorted_curve_mse_pairs:  # Check if the list is empty
+            return None, None, None  # Or any other appropriate default values
 
         # Unpack curves and MSEs from sorted pairs
         curves, mses, clusters = zip(*sorted_curve_mse_pairs)  # This will unzip the pairs into two tuples
@@ -167,8 +174,13 @@ class LaneDetectionPolyfit(IControlAlgorithm, IObservable):
         return curves, mses, clusters
 
     def select_lane_candidates(self, curves, mses, clusters, sizes):
+        if curves is None or len(curves) == 0:
+            return []
+
+        print("curves, mses, sizes", curves,mses,sizes)
+
         # Define thresholds and epsilon to prevent division by zero
-        score_thresh = -2.5
+        score_thresh = -15
         mse_threshold = 50
         min_cluster_size = 50
         epsilon = 1e-6
@@ -202,7 +214,7 @@ class LaneDetectionPolyfit(IControlAlgorithm, IObservable):
         # Sort candidates by computed score (higher is better)
         filtered_candidates.sort(key=lambda x: x[4], reverse=True)
 
-        #print("MSE, Size, Score",[(mse, size, score) for curve, mse, cluster, size, score in filtered_candidates])
+        print("MSE, Size, Score",[(mse, size, score) for curve, mse, cluster, size, score in filtered_candidates])
 
         # Select up to two best candidates based on score
         #selected_candidates = scored_candidates[:2]
@@ -234,13 +246,18 @@ class LaneDetectionPolyfit(IControlAlgorithm, IObservable):
 
     def detect_curves_dbscan(self, img, image_height, image_width):
         clusters, labels = self.cluster_points(img)
-        if clusters is None or len(clusters) < 0:
-            return None, None, None, None
-        clusters.sort(key=len, reverse=True)
+        # if clusters is None or len(clusters) <= 0:
+        #     return None, None, None, None
 
 
+        if clusters is not None:
+            clusters.sort(key=len, reverse=True)
+
+        cluster_sizes = None
         curves, mses, clusters = self.fit_polynomials(clusters)
-        cluster_sizes = [len(x) for x in clusters if x is not None]
+        if clusters is not None:
+            cluster_sizes = [len(x) for x in clusters if x is not None]
+
         selected_lane_candidates = self.select_lane_candidates(curves, mses, clusters, cluster_sizes)
 
         # Get predictions from the Kalman filters for both lanes
@@ -250,6 +267,8 @@ class LaneDetectionPolyfit(IControlAlgorithm, IObservable):
         left_lane = None
         right_lane = None
         if not selected_lane_candidates:
+            self.right_lane_prediction_counter += 1
+            self.left_lane_prediction_counter += 1
             left_lane = predicted_left
             right_lane = predicted_right
             print("Subsitute both lanes by kalman prediction")
@@ -258,6 +277,8 @@ class LaneDetectionPolyfit(IControlAlgorithm, IObservable):
             [[cluster1, lane1, lane_score1], [cluster2, lane2, lane_score2]] = selected_lane_candidates
             x_bottom1 = np.polyval(lane1, image_height)
             x_bottom2 = np.polyval(lane2, image_height)
+            self.right_lane_prediction_counter = 0
+            self.left_lane_prediction_counter = 0
             # print("Lane1:", lane1)
             # print("Lane2:", lane2)
             if x_bottom1 < x_bottom2: #determine right and left lane
@@ -278,22 +299,31 @@ class LaneDetectionPolyfit(IControlAlgorithm, IObservable):
             left_lane, right_lane = self.select_lane_candidates_using_kalman(lanes, predicted_left, predicted_right)
             if left_lane is not None: # Update Kalman, since a left lane was found which aligns with the prediction
                 self.update_kalman_filter(self.kf_left_lane, left_lane)
+                self.left_lane_prediction_counter = 0
             else:
                 left_lane = predicted_left
                 print("Subsitute left lane by kalman prediction")
 
             if right_lane is not None: # Update Kalman, since a right lane was found which aligns with the prediction
                 self.update_kalman_filter(self.kf_right_lane, right_lane)
+                self.right_lane_prediction_counter = 0
             else:
                 right_lane = predicted_right
                 print("Subsitute right lane by kalman prediction")
 
+        if self.right_lane_prediction_counter > 10 or self.left_lane_prediction_counter > 10:
+            return (None, None, None, None)
 
         # Calculate the road center based on the selected or predicted lanes
         road_center = self.calculate_road_center([left_lane, right_lane], image_height)
-        img_colored = self.color_clusters(img, labels)
 
-        return (left_lane, right_lane, road_center, img_colored)
+        if clusters is not None:
+            img = self.color_clusters(img, labels)
+        else:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+
+
+        return (left_lane, right_lane, road_center, img)
 
 
     def visualize_curves(self, frame, left_curve, right_curve, image_height):

@@ -7,7 +7,7 @@ package_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 # Add the package directory to the Python path
 sys.path.append(package_dir)
 
-
+os.environ['SDL_AUDIODRIVER'] = 'dsp'
 
 
 def capture():
@@ -115,6 +115,6 @@ def testLaneDetectionDesktop():
 
 if __name__ == "__main__":
     #capture()
-    testLaneDetectionDesktop()
-    #drivePilotNet()
+    #testLaneDetectionDesktop()
+    drivePilotNet()
     #driveLaneDetection()
