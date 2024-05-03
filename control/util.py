@@ -9,4 +9,4 @@ def timer(label):
     finally:
         end = time.perf_counter()
         elapsed_time = end - start
-        print(f"{label}: {format(elapsed_time, '.5f')} seconds")
+        #print(f"{label}: {format(elapsed_time, '.5f')} seconds")

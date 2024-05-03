@@ -1,25 +1,26 @@
+
 import sys
 import os
-
-
 # Get the path to the directory containing the 'control' package
 package_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
 # Add the package directory to the Python path
 sys.path.append(package_dir)
 
-from XboxInput import XboxInput
-from LaneDetectionHough import LaneDetectionHough
-from LaneDetectionPilotNet import LaneDetectionPilotnet
-from RPiServer import RPiServer
-from CameraCapture import CameraCapture
-from LaneDetectionPolyFit import LaneDetectionPolyfit
-from DataRecorder import DataRecorder
-from DummyCommandInterface import DummyCommandInterface
-from ControlManager import ControlManager
-from CommandInterface import CommandInterface
+
+
 
 def capture():
+    from XboxInput import XboxInput
+    from LaneDetectionHough import LaneDetectionHough
+    from LaneDetectionPilotNet import LaneDetectionPilotnet
+    from RPiServer import RPiServer
+    from CameraCapture import CameraCapture
+    from LaneDetectionPolyFit import LaneDetectionPolyfit
+    from DataRecorder import DataRecorder
+    from DummyCommandInterface import DummyCommandInterface
+    from ControlManager import ControlManager
+    from CommandInterface import CommandInterface
     recorder = DataRecorder()
 
     xbox_input = XboxInput(input_freq=5)
@@ -37,6 +38,12 @@ def capture():
     #recorder.start()
 
 def drivePilotNet():
+    from XboxInput import XboxInput
+    from LaneDetectionPilotNet import LaneDetectionPilotnet
+    from RPiServer import RPiServer
+    from CameraCapture import CameraCapture
+    from ControlManager import ControlManager
+    from CommandInterface import CommandInterface
     xbox_input = XboxInput()
     xbox_input.start()  # Start the input polling thread
 
@@ -59,6 +66,12 @@ def drivePilotNet():
 
 
 def driveLaneDetection():
+    from XboxInput import XboxInput
+    from RPiServer import RPiServer
+    from CameraCapture import CameraCapture
+    from LaneDetectionPolyFit import LaneDetectionPolyfit
+    from ControlManager import ControlManager
+    from CommandInterface import CommandInterface
     xbox_input = XboxInput()
     xbox_input.start()  # Start the input polling thread
 
@@ -81,6 +94,9 @@ def driveLaneDetection():
     control_manager.start()  # start thread
 
 def testLaneDetectionDesktop():
+    from RPiServer import RPiServer
+    from CameraCapture import CameraCapture
+    from LaneDetectionPolyFit import LaneDetectionPolyfit
 
 
     server = RPiServer()
@@ -99,6 +115,6 @@ def testLaneDetectionDesktop():
 
 if __name__ == "__main__":
     #capture()
-    #testLaneDetectionDesktop()
+    testLaneDetectionDesktop()
     #drivePilotNet()
-    driveLaneDetection()
+    #driveLaneDetection()
