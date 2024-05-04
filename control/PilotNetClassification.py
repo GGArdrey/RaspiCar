@@ -12,6 +12,9 @@ from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
 from datetime import datetime
 from tensorflow.keras.utils import to_categorical
 import numpy as np
+from tensorflow.math import confusion_matrix
+import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.utils import class_weight
 
 def custom_loss(class_weights):
@@ -42,7 +45,7 @@ class PilotNetClassification:
         self.target_width = 200
         self.target_height = 66
         self.batch_size = 64
-        self.epochs = 100
+        self.epochs = 1000
         self.data_dirs = data_dirs
         date_time = datetime.now().strftime("%d-%m-%Y_%H-%M")
         self.log_dir_base = os.path.join(save_dir, date_time, "log/")
@@ -63,7 +66,8 @@ class PilotNetClassification:
         return nearest_index
 
     def load_images_and_labels(self):
-        labels = []
+        continuous_labels = []
+        categorical_labels = []
         images = []
         for dir in self.data_dirs:
             filenames = os.listdir(dir)
@@ -75,8 +79,9 @@ class PilotNetClassification:
                         image = self.resize_and_crop_image(image)
                         images.append(image)
                         angle = float(filename.split('_')[1].replace('.jpg', ''))
-                        labels.append(self.map_label_to_class(angle))
-        return np.array(images), np.array(labels)
+                        continuous_labels.append(angle)
+                        categorical_labels.append(self.map_label_to_class(angle))
+        return np.array(images), np.array(categorical_labels), np.array(continuous_labels)
 
     def create_model_checkpoint(self):
         # Define the checkpoint path using the .keras extension
@@ -176,7 +181,7 @@ class PilotNetClassification:
         return model
 
     def train(self, batch_size=32, epochs=100):
-        images, labels = self.load_images_and_labels()
+        images, labels, continuous_labels = self.load_images_and_labels()
 
         # Split data into train+val and test sets
         train_val_images, test_images, train_val_labels, test_labels = train_test_split(
@@ -220,7 +225,7 @@ class PilotNetClassification:
         tensorboard_callback = TensorBoard(log_dir=self.log_dir_base, histogram_freq=1)
         checkpoint_callback = self.create_model_checkpoint()
 
-        self.write_log_pre_training(model, labels, train_images, val_images, test_images, train_labels, val_labels,
+        self.write_log_pre_training(model, labels,continuous_labels, train_images, val_images, test_images, train_labels, val_labels,
                                     test_labels)
 
         model.fit(train_dataset, validation_data = val_dataset, epochs=self.epochs, callbacks=[tensorboard_callback,checkpoint_callback])
@@ -240,10 +245,9 @@ class PilotNetClassification:
         true_labels = np.argmax(test_labels, axis=1)  # Adjust if test_labels are not in the correct shape
 
         # Generate the confusion matrix
-        from tensorflow.math import confusion_matrix
-        import matplotlib.pyplot as plt
-        import seaborn as sns
+
         conf_matrix = confusion_matrix(true_labels, test_predictions)
+
 
         # Optionally, visualize the confusion matrix
         plt.figure(figsize=(10, 7))
@@ -254,7 +258,7 @@ class PilotNetClassification:
         plt.savefig(self.log_dir_base + "confusion_matrix")
         plt.show()
 
-    def write_log_pre_training(self, model, labels, train_images, val_images, test_images, train_labels, val_labels,
+    def write_log_pre_training(self, model, labels, continuous_labels,train_images, val_images, test_images, train_labels, val_labels,
                                test_labels):
         '''
         Write a log before training with details to the data, data distribution plots and architecture
@@ -288,6 +292,24 @@ class PilotNetClassification:
 
             log.write("\nDistribution of Steering Angles for Test Data\n")
             log.write(f"Number of Images: {len(test_labels)}\n")
+
+            # Histogram for continuous labels
+            plt.figure(figsize=(10, 5))
+            plt.hist(continuous_labels, bins=20, color='blue', alpha=0.7)
+            plt.title('Histogram of Continuous Steering Angles')
+            plt.xlabel('Steering Angle')
+            plt.ylabel('Frequency')
+            plt.savefig(self.log_dir_base + "histogram_continuous.png")
+            plt.close()
+
+            # Histogram for categorical labels
+            plt.figure(figsize=(10, 5))
+            plt.hist(labels, bins=len(self.boundaries), color='green', alpha=0.7)
+            plt.title('Histogram of Categorical Steering Angles')
+            plt.xlabel('Steering Angle Categories')
+            plt.ylabel('Frequency')
+            plt.savefig(self.log_dir_base + "histogram_categorical.png")
+            plt.close()
 
 
 # Example usage

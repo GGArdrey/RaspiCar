@@ -26,7 +26,7 @@ class LaneDetectionPilotnet(IControlAlgorithm, IObservable):
         self.pilotnet = PilotNet("","")
         #self.model = self.load_model()
 
-        self.interpreter = Interpreter(model_path="/home/pi/models/cp-0010.tflite")
+        self.interpreter = Interpreter(model_path="/home/pi/models/model.tflite")
         self.interpreter.allocate_tensors()
         # Get input and output details
         self.input_details = self.interpreter.get_input_details()
@@ -139,6 +139,13 @@ class LaneDetectionPilotnet(IControlAlgorithm, IObservable):
 
         # Print the predicted class
         print(f"Predicted Class: {classes[predicted_class]}")
+        # Calculate the neighborhood probabilities
+        left_prob = predictions[predicted_class - 1] if predicted_class > 0 else 0
+        right_prob = predictions[predicted_class + 1] if predicted_class < len(predictions) - 1 else 0
+        neighborhood_prob = predictions[predicted_class] + left_prob + right_prob
+
+        # Print the neighborhood probability
+        print(f"Predicted Class 1-Neighborhood: {neighborhood_prob * 100:.2f}%")
 
         car_commands.steer = classes[predicted_class]  # Assuming steer is now used to represent the predicted class
 
