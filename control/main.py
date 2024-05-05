@@ -22,7 +22,6 @@ def capture():
     from ControlManager import ControlManager
     from CommandInterface import CommandInterface
     recorder = DataRecorder()
-
     xbox_input = XboxInput(input_freq=5)
     xbox_input.register_observer(recorder)
     xbox_input.start()  # Start the input polling thread
@@ -152,10 +151,51 @@ def driveBoth():
     lane_detector2.register_observer(control_manager)
     control_manager.start()  # start thread
 
+def capture_lanedetection_poly():
+    from XboxInput import XboxInput
+    from LaneDetectionHough import LaneDetectionHough
+    from LaneDetectionPilotNet import LaneDetectionPilotnet
+    from RPiServer import RPiServer
+    from CameraCapture import CameraCapture
+    from LaneDetectionPolyFit import LaneDetectionPolyfit
+    from DataRecorder import DataRecorder
+    from DummyCommandInterface import DummyCommandInterface
+    from ControlManager import ControlManager
+    from CommandInterface import CommandInterface
+
+
+
+    recorder = DataRecorder()
+    server = RPiServer()
+    server.start()  # starting acceting and sending thread inside server
+
+    xbox_input = XboxInput()
+    xbox_input.register_observer(recorder)
+    xbox_input.start()  # Start the input polling thread
+
+
+    #lane_detector = LaneDetectionHough()
+    lane_detector = LaneDetectionPolyfit()
+    lane_detector.register_observer(server)
+    lane_detector.register_observer(recorder)
+
+    lane_detector.start()  # Begin processing frames thread
+
+    camera = CameraCapture(frame_width=640, frame_height=360)
+
+    camera.register_observer(lane_detector)
+    camera.start()  # Start capturing frames and sending it to observers thread
+
+    command_interface = CommandInterface()
+    control_manager = ControlManager(command_interface, xbox_input, lane_detector, None)
+    lane_detector.register_observer(control_manager)
+    control_manager.start()  # start thread
+    recorder.start()
 
 if __name__ == "__main__":
     #capture()
     #testLaneDetectionDesktop()
     #drivePilotNet()
-    #driveLaneDetection()
-    driveBoth()
+    driveLaneDetection()
+    #driveBoth()
+    #capture_lanedetection_poly()

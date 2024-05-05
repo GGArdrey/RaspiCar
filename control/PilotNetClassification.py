@@ -45,7 +45,7 @@ class PilotNetClassification:
         self.target_width = 200
         self.target_height = 66
         self.batch_size = 64
-        self.epochs = 50
+        self.epochs = 25
         self.data_dirs = data_dirs
         date_time = datetime.now().strftime("%d-%m-%Y_%H-%M")
         self.log_dir_base = os.path.join(save_dir, date_time, "log/")
@@ -176,7 +176,7 @@ class PilotNetClassification:
             staircase=True)
         optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
 
-        model.compile(loss="categorical_crossentropy", optimizer=optimizer, metrics=['accuracy']) #custom_loss([1.71521336, 3.23251748, 1.17000633, 1.04404291, 0.85469954, 0.39863457, 1.01463325, 0.99462076, 0.99658642, 1.71521336, 0.96235253])
+        model.compile(loss=custom_loss([1.71521336, 3.23251748, 1.17000633, 1.04404291, 0.85469954, 0.39863457, 1.01463325, 0.99462076, 0.99658642, 1.71521336, 0.96235253]), optimizer=optimizer, metrics=['accuracy']) #
         return model
 
     def train(self, batch_size=32, epochs=100):
@@ -239,9 +239,19 @@ class PilotNetClassification:
         model.evaluate(test_dataset)
 
 
+
+
         test_predictions = model.predict(test_dataset)
         test_predictions = np.argmax(test_predictions, axis=1)
         true_labels = np.argmax(test_labels, axis=1)  # Adjust if test_labels are not in the correct shape
+
+
+        one_neighbour_acc = self.one_neighbour_accuracy(test_predictions, true_labels)
+
+        from sklearn.metrics import accuracy_score
+        accuracy = accuracy_score(true_labels, test_predictions)
+
+
 
         # Generate the confusion matrix
 
@@ -253,9 +263,36 @@ class PilotNetClassification:
         sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=range(len(self.boundaries)), yticklabels=range(len(self.boundaries)))
         plt.xlabel('Predicted Labels')
         plt.ylabel('True Labels')
-        plt.title('Confusion Matrix')
+        plt.title('Confusion Matrix for PilotNet$_{C}$')
         plt.savefig(self.log_dir_base + "confusion_matrix")
         plt.show()
+
+
+        with open(self.log_dir_base + 'info.txt', 'a') as log:
+            # Write metrics to log file
+            log.write(f"Accuracy: {accuracy}\n")
+            #log.write(f"1-Neighbourhood Accuracy: {one_neighbour_acc}\n")
+
+
+
+    #
+    # # Define a function to calculate 1-Neighbourhood accuracy
+    # def one_neighbour_accuracy(self, pred, true_labels):
+    #     correct = 0
+    #     for i in range(len(pred)):
+    #         # Check if the prediction matches the true label
+    #         if pred[i] == true_labels[i]:
+    #             correct += 1
+    #         # Check adjacent labels for all other cases
+    #         else:
+    #             # If not the first item, check the previous label
+    #             if i > 0 and pred[i] == true_labels[i - 1]:
+    #                 correct += 1
+    #             # If not the last item, check the next label
+    #             if i < len(pred) - 1 and pred[i] == true_labels[i + 1]:
+    #                 correct += 1
+    #     return correct / len(pred)
+
 
     def write_log_pre_training(self, model, labels, continuous_labels,train_images, val_images, test_images, train_labels, val_labels,
                                test_labels):
@@ -294,19 +331,28 @@ class PilotNetClassification:
 
             # Histogram for continuous labels
             plt.figure(figsize=(10, 5))
-            plt.hist(continuous_labels, bins=20, color='blue', alpha=0.7)
+            counts, bin_edges, _ = plt.hist(continuous_labels, bins=50, color='blue', alpha=0.7,rwidth=0.98)
             plt.title('Histogram of Continuous Steering Angles')
             plt.xlabel('Steering Angle')
             plt.ylabel('Frequency')
+            plt.grid(True)
+            # Adding text labels above bars
             plt.savefig(self.log_dir_base + "histogram_continuous.png")
             plt.close()
 
             # Histogram for categorical labels
             plt.figure(figsize=(10, 5))
-            plt.hist(labels, bins=len(self.boundaries), color='green', alpha=0.7)
+            counts, bin_edges, _ = plt.hist(labels, bins=len(self.boundaries), color='green', alpha=0.7,rwidth=0.95)
             plt.title('Histogram of Categorical Steering Angles')
             plt.xlabel('Steering Angle Categories')
             plt.ylabel('Frequency')
+            plt.grid(True)
+            # Adding text labels above bars
+            bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])  # Calculate bin centers
+            for count, x in zip(counts, bin_centers):
+                # Only put text above bars with counts more than 0
+                if count > 0:
+                    plt.text(x, count, str(int(count)), ha='center', va='bottom')
             plt.savefig(self.log_dir_base + "histogram_categorical.png")
             plt.close()
 
