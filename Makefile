@@ -28,4 +28,7 @@ copy:
 	scp -r pi@raspberrypi.local:/home/pi/data/* ./data/
 
 upload-model:
-	scp -r ./training/04-05-2024_01-44/checkpoints/model.tflite pi@raspberrypi.local:/home/pi/models/
+	scp -r ./training/05-05-2024_10-21/checkpoints/cp-0024.tflite pi@raspberrypi.local:/home/pi/models/
+
+copy-log:
+	scp -r pi@raspberrypi.local:/home/pi/log.csv ./

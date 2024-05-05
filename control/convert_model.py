@@ -21,10 +21,10 @@ import tensorflow as tf
 
 
 # Convert the model.
-model = tf.keras.models.load_model('/home/luca/raspicar/training/04-05-2024_00-24/checkpoints/cp-0010.keras')
+model = tf.keras.models.load_model('/home/luca/raspicar/training/05-05-2024_10-21/checkpoints/cp-0024.keras')
 converter = tf.lite.TFLiteConverter.from_keras_model(model)
 tflite_model = converter.convert()
 
 # Save the model.
-with open('/home/luca/raspicar/training/04-05-2024_00-24/checkpoints/cp-0010.tflite', 'wb') as f:
+with open('/home/luca/raspicar/training/05-05-2024_10-21/checkpoints/cp-0024.tflite', 'wb') as f:
   f.write(tflite_model)

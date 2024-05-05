@@ -61,7 +61,8 @@ def drivePilotNet():
     camera.start()  # Start capturing frames and sending it to observers thread
 
     command_interface = CommandInterface()
-    control_manager = ControlManager(command_interface, xbox_input, lane_detector)
+    control_manager = ControlManager(command_interface, xbox_input, lane_detector, None)
+    lane_detector.register_observer(control_manager)
     control_manager.start()  # start thread
 
 
@@ -90,7 +91,8 @@ def driveLaneDetection():
     camera.start()  # Start capturing frames and sending it to observers thread
 
     command_interface = CommandInterface()
-    control_manager = ControlManager(command_interface, xbox_input, lane_detector)
+    control_manager = ControlManager(command_interface, xbox_input, lane_detector, None)
+    lane_detector.register_observer(control_manager)
     control_manager.start()  # start thread
 
 def testLaneDetectionDesktop():
@@ -113,8 +115,47 @@ def testLaneDetectionDesktop():
     camera.start()  # Start capturing frames and sending it to observers thread
 
 
+def driveBoth():
+    from XboxInput import XboxInput
+    from RPiServer import RPiServer
+    from CameraCapture import CameraCapture
+    from LaneDetectionPolyFit import LaneDetectionPolyfit
+    from ControlManager import ControlManager
+    from CommandInterface import CommandInterface
+    from LaneDetectionPilotNet import LaneDetectionPilotnet
+
+    xbox_input = XboxInput()
+    xbox_input.start()  # Start the input polling thread
+
+    server = RPiServer()
+    server.start()  # starting acceting and sending thread inside server
+
+
+
+    lane_detector1 = LaneDetectionPilotnet()
+    #lane_detector1.register_observer(server)
+    lane_detector1.start()  # Begin processing frames thread
+
+    lane_detector2 = LaneDetectionPolyfit()
+    lane_detector2.register_observer(server)
+    lane_detector2.start()  # Begin processing frames thread
+
+    camera = CameraCapture(frame_width=640, frame_height=360)
+
+    camera.register_observer(lane_detector1)
+    camera.register_observer(lane_detector2)
+    camera.start()  # Start capturing frames and sending it to observers thread
+
+    command_interface = CommandInterface()
+    control_manager = ControlManager(command_interface, xbox_input, lane_detector1, lane_detector2)
+    lane_detector1.register_observer(control_manager)
+    lane_detector2.register_observer(control_manager)
+    control_manager.start()  # start thread
+
+
 if __name__ == "__main__":
     #capture()
     #testLaneDetectionDesktop()
-    drivePilotNet()
+    #drivePilotNet()
     #driveLaneDetection()
+    driveBoth()

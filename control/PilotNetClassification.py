@@ -45,7 +45,7 @@ class PilotNetClassification:
         self.target_width = 200
         self.target_height = 66
         self.batch_size = 64
-        self.epochs = 1000
+        self.epochs = 50
         self.data_dirs = data_dirs
         date_time = datetime.now().strftime("%d-%m-%Y_%H-%M")
         self.log_dir_base = os.path.join(save_dir, date_time, "log/")
@@ -176,8 +176,7 @@ class PilotNetClassification:
             staircase=True)
         optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
 
-        model.compile(loss=custom_loss([1.71521336, 3.23251748, 1.17000633, 1.04404291, 0.85469954, 0.39863457,
- 1.01463325, 0.99462076, 0.99658642, 1.71521336, 0.96235253]), optimizer=optimizer, metrics=['accuracy'])
+        model.compile(loss="categorical_crossentropy", optimizer=optimizer, metrics=['accuracy']) #custom_loss([1.71521336, 3.23251748, 1.17000633, 1.04404291, 0.85469954, 0.39863457, 1.01463325, 0.99462076, 0.99658642, 1.71521336, 0.96235253])
         return model
 
     def train(self, batch_size=32, epochs=100):
@@ -228,7 +227,7 @@ class PilotNetClassification:
         self.write_log_pre_training(model, labels,continuous_labels, train_images, val_images, test_images, train_labels, val_labels,
                                     test_labels)
 
-        model.fit(train_dataset, validation_data = val_dataset, epochs=self.epochs, callbacks=[tensorboard_callback,checkpoint_callback])
+        model.fit(train_dataset, validation_data = val_dataset, epochs=self.epochs, callbacks=[tensorboard_callback,checkpoint_callback],class_weight=class_weights_dict)
         converter = tf.lite.TFLiteConverter.from_keras_model(model)
         converter.optimizations = [tf.lite.Optimize.DEFAULT]
         converter.target_spec.supported_types = [tf.float16] #TODO maybe change optimization

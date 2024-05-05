@@ -1,17 +1,18 @@
 class CarCommands:
-    def __init__(self, steer=0.0, throttle=0.0, stop=0.0, start_capture=False, stop_capture=False):
+    def __init__(self, steer=0.0, throttle=0.0, stop=0.0, start_capture=False, stop_capture=False, additional_info = None):
         self._steer = steer
         self._throttle = throttle
         self._stop = stop #TODO this needs to be bool not float
         self._start_capture = start_capture
         self._stop_capture = stop_capture
+        self._additional_info = additional_info
 
     def copy(self):
         '''
         Create a copy of itself
         :return: CarCommands
         '''
-        return CarCommands(self._steer, self._throttle, self._stop, self.start_capture, self.stop_capture)
+        return CarCommands(self._steer, self._throttle, self._stop, self._start_capture, self._stop_capture, self._additional_info)
 
     @property
     def steer(self) -> float:
@@ -62,3 +63,11 @@ class CarCommands:
         if not isinstance(value, bool):
             raise TypeError("Stop capture value must be a boolean")
         self._stop_capture = value
+
+    @property
+    def additional_info(self):
+        return self._additional_info
+
+    @additional_info.setter
+    def additional_info(self, value):
+        self._additional_info = value

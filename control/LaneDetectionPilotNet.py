@@ -26,7 +26,7 @@ class LaneDetectionPilotnet(IControlAlgorithm, IObservable):
         self.pilotnet = PilotNet("","")
         #self.model = self.load_model()
 
-        self.interpreter = Interpreter(model_path="/home/pi/models/model.tflite")
+        self.interpreter = Interpreter(model_path="/home/pi/models/cp-0024.tflite")
         self.interpreter.allocate_tensors()
         # Get input and output details
         self.input_details = self.interpreter.get_input_details()
@@ -41,14 +41,14 @@ class LaneDetectionPilotnet(IControlAlgorithm, IObservable):
         #model = self.pilotnet.build_model()
         #return model.load_weights("/home/pi/models/cp-0091.ckpt")
         #return tf.keras.models.load_model('/home/pi/models/cp-0001.keras', custom_objects={'StandardizationLayer': StandardizationLayer})
-        return tf.keras.models.load_model('/home/pi/models/cp-0025.keras')
+        return tf.keras.models.load_model('/home/pi/models/model.keras')
 
     def load_model_tflite(self):
         raise NotImplementedError
 
     def start(self):
         if not self.running:
-            print("Starting Lane Detection Hough Thread...")
+            print("Starting Lane Detection PilotNet Thread...")
             self.running = True
             self.processing_thread = threading.Thread(target=self.wait_and_process_frames)
             self.processing_thread.start()
@@ -133,22 +133,37 @@ class LaneDetectionPilotnet(IControlAlgorithm, IObservable):
 
         # Use argmax to find the most likely class label
         predicted_class = np.argmax(predictions)
+
+        # Calculate the neighborhood probabilities
+        max_prob = predictions[predicted_class]
+        left_prob = predictions[predicted_class - 1] if predicted_class > 0 else 0
+        right_prob = predictions[predicted_class + 1] if predicted_class < len(predictions) - 1 else 0
+        neighborhood_prob = max_prob + left_prob + right_prob
+
+
+        # Calculate the probabilities and angles for steering calculation
+        total_prob = max_prob + left_prob + right_prob
+        weighted_steer_value = (left_prob * classes[predicted_class - 1] if predicted_class > 0 else 0) + \
+                      (max_prob * classes[predicted_class]) + \
+                      (right_prob * classes[predicted_class + 1] if predicted_class < len(predictions) - 1 else 0)
+
+        # Normalize steer value if total_prob is not zero
+        weighted_steer_value = weighted_steer_value / total_prob if total_prob > 0 else 0
+
+
         print("Predictions:")
         for i, pred in enumerate(predictions):
             print(f"  {classes[i]}: {pred * 100:.2f}%")
 
-        # Print the predicted class
         print(f"Predicted Class: {classes[predicted_class]}")
-        # Calculate the neighborhood probabilities
-        left_prob = predictions[predicted_class - 1] if predicted_class > 0 else 0
-        right_prob = predictions[predicted_class + 1] if predicted_class < len(predictions) - 1 else 0
-        neighborhood_prob = predictions[predicted_class] + left_prob + right_prob
 
         # Print the neighborhood probability
+        print(f"Predicted Class Probability: {max_prob * 100:.2f}%")
         print(f"Predicted Class 1-Neighborhood: {neighborhood_prob * 100:.2f}%")
-
-        car_commands.steer = classes[predicted_class]  # Assuming steer is now used to represent the predicted class
-
+        print(f"Average Prediction in 1-Neighborhood: {weighted_steer_value:.2f}")
+        current_time = round(time.time() * 1000)
+        car_commands.steer = weighted_steer_value  # Assuming steer is now used to represent the predicted class
+        car_commands.additional_info = [current_time, classes[predicted_class],weighted_steer_value,max_prob,neighborhood_prob,predictions]
         with self.lock:
             self.car_commands = car_commands
         self._notify_observers(frame, timestamp=time.time())

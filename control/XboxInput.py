@@ -59,6 +59,7 @@ class XboxInput(IInputSource, IObservable):
     def start(self):
         self.running = True
         self.thread = Thread(target=self._poll_inputs)
+        print("Started Xbox Thread")
         self.thread.start()
 
     def stop(self):

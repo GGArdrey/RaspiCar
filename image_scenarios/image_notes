@@ -1,0 +1,62 @@
+
+sharp curve polyfit png
+MSE        Size       Score     
+------------------------------
+16.058      323      9.280
+15.442      40      0.540
+------------------------------
+Predictions:
+  -1.0: 0.00%
+  -0.8: 0.00%
+  -0.6: 0.01%
+  -0.4: 0.01%
+  -0.2: 0.01%
+  0: 0.03%
+  0.2: 6.02%
+  0.4: 42.85%
+  0.6: 39.76%
+  0.8: 10.45%
+  1.0: 0.87%
+Predicted Class: 0.4
+Predicted Class Probability: 42.85%
+Predicted Class 1-Neighborhood: 88.63%
+Average Prediction in 1-Neighborhood: 0.48
+
+
+
+
+
+
+sharp curve polyfit rubics png
+------------------------------
+16.247      320      9.108
+66.492      73      0.975
+15.801      39      0.526
+------------------------------
+Predictions:
+  -1.0: 0.01%
+  -0.8: 0.01%
+  -0.6: 0.07%
+  -0.4: 0.08%
+  -0.2: 0.06%
+  0: 0.13%
+  0.2: 8.08%
+  0.4: 35.41%
+  0.6: 39.46%
+  0.8: 15.01%
+  1.0: 1.67%
+
+Predicted Class: 0.6
+Predicted Class Probability: 39.46%
+Predicted Class 1-Neighborhood: 89.88%
+Average Prediction in 1-Neighborhood: 0.55
+
+
+ 
+
+
+
+
+
+
+

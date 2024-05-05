@@ -10,6 +10,7 @@ from IObservable import IObservable
 from sklearn.cluster import KMeans, DBSCAN
 np.random.RandomState(seed=123)
 from filterpy.kalman import KalmanFilter
+from sympy import symbols, diff, atan, N
 
 class LaneDetectionPolyfit(IControlAlgorithm, IObservable):
 
@@ -22,7 +23,7 @@ class LaneDetectionPolyfit(IControlAlgorithm, IObservable):
         self.car_commands = CarCommands()
         self.processing_thread = None
         self.running = False
-        self.pid_controller = PIDController(0.02,0,0)
+        self.pid_controller = PIDController(0.02,0.0,0.05)
         # Initialize two Kalman Filters
         self.kf_left_lane = self.initialize_kalman()
         self.kf_right_lane = self.initialize_kalman()
@@ -31,7 +32,7 @@ class LaneDetectionPolyfit(IControlAlgorithm, IObservable):
 
     def start(self):
         if not self.running:
-            print("Starting Lane Detection Hough Thread...")
+            print("Starting Lane Detection PolyFit Thread...")
             self.running = True
             self.processing_thread = threading.Thread(target=self.wait_and_process_frames)
             self.processing_thread.start()
@@ -69,29 +70,47 @@ class LaneDetectionPolyfit(IControlAlgorithm, IObservable):
             img = self.denoise_frame(img)
             img = self.detect_edges(img)
 
-            FRAME_WIDTH, FRAME_HEIGHT = img.shape
-            left_lines, right_lines, road_center, colored_clusters_img = self.detect_curves_dbscan(img, 66, 200)
+            left_lines, right_lines, road_center, info = self.detect_curves_dbscan(img, 66, 200)
+
+            # steering_deg = None
+            # if left_lines is not None and right_lines is not None:
+            #     steering_deg = self.compute_steering_curviture(left_lines,right_lines)
 
 
-            # Compute steering based on road center
-            FRAME_WIDTH, FRAME_HEIGHT = img.shape
-            #print("center: ", road_center)
-            if road_center is not None:
+            if road_center is not None and info is not None:
                 car_commands.steer = self.pid_controller.compute_steering(road_center, 200)
-                #print("Steer Lane Detection: ", car_commands.steer)
+                # car_commands.steer = steering_deg/40
+                car_commands.additional_info = info
+                with self.lock:
+                    self.car_commands = car_commands
 
-            with self.lock:
-                self.car_commands = car_commands
 
             img_color = self.visualize_curves(img_color, left_lines, right_lines, 66)
             img_color = self.visualize_center(img_color, road_center, 66)
+            img_canny_color = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+            img_color = cv2.addWeighted(img_canny_color, 1, img_color, 1, 0)
+            self._notify_observers(img_color, timestamp=time.time())
 
 
-            #img_canny_color = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-            if colored_clusters_img is not None:
-                img_color = cv2.addWeighted(colored_clusters_img, 1, img_color, 1, 0)
-            self._notify_observers(img_color,timestamp = time.time())
+    def compute_steering_curviture(self, left_coeffs, right_coeffs):
+        # Example coefficients (replace with your actual values)
+        # Assume a fixed look-ahead distance (e.g., 10 meters)
+        look_ahead_distance = 55
+        # Calculate the curvature for each lane
+        left_curvature = left_coeffs[0] / (
+                1 + (2 * left_coeffs[0] * look_ahead_distance + left_coeffs[1]) ** 2) ** (3 / 2)
+        right_curvature = right_coeffs[0] / (
+                1 + (2 * right_coeffs[0] * look_ahead_distance + right_coeffs[1]) ** 2) ** (3 / 2)
+        # Compute the average radius of curvature
+        radius = 1 / ((left_curvature + right_curvature) / 2)
+        # Calculate the desired steering angle
+        steering_angle = np.arctan((2 * look_ahead_distance) / (2 * radius))
+        # Convert radians to degrees
+        steering_angle_degrees = steering_angle * (180 / np.pi)
 
+        #print(f"Steering angle in radians: {steering_angle:.4f}")
+        print(f"Steering angle in degrees: {steering_angle_degrees:.4f}")
+        return steering_angle_degrees
 
     def resize_and_crop_image(self, image, target_width=200, target_height=66):
         # Check input image dimensions
@@ -173,19 +192,19 @@ class LaneDetectionPolyfit(IControlAlgorithm, IObservable):
 
         return curves, mses, clusters
 
-    def select_lane_candidates(self, curves, mses, clusters, sizes):
+    def select_lane_candidates_old(self, curves, mses, clusters, sizes):
         if curves is None or len(curves) == 0:
             return []
 
-        print("curves, mses, sizes", curves,mses,sizes)
+        #print("curves, mses, sizes", curves,mses,sizes)
 
         # Define thresholds and epsilon to prevent division by zero
         score_thresh = -15
-        mse_threshold = 50
-        min_cluster_size = 50
+        mse_threshold = 5000
+        min_cluster_size = 0
         epsilon = 1e-6
         alpha = 1
-        beta =1
+        beta = 2
 
         # Filter out based on MSE and size
         filtered_candidates = [
@@ -206,20 +225,52 @@ class LaneDetectionPolyfit(IControlAlgorithm, IObservable):
         ]
 
         # Filter out based on Score
-        filtered_candidates = [
-            (curve, mse, cluster, size, score) for curve, mse, cluster, size, score in scored_candidates
-            if score > score_thresh
-        ]
+        # filtered_candidates = [
+        #     (curve, mse, cluster, size, score) for curve, mse, cluster, size, score in scored_candidates
+        #     if score > score_thresh
+        # ]
 
         # Sort candidates by computed score (higher is better)
-        filtered_candidates.sort(key=lambda x: x[4], reverse=True)
+        scored_candidates.sort(key=lambda x: x[4], reverse=True)
 
-        print("MSE, Size, Score",[(mse, size, score) for curve, mse, cluster, size, score in filtered_candidates])
+        #print("MSE, Size, Score",[(mse, size, score) for curve, mse, cluster, size, score in filtered_candidates])
 
         # Select up to two best candidates based on score
         #selected_candidates = scored_candidates[:2]
 
-        return [[cluster, curve, score] for curve, mse, cluster, size, score in filtered_candidates] #, score)
+        return [[curve, mse, cluster, size, score ] for curve, mse, cluster, size, score in scored_candidates] #, score)
+
+    def select_lane_candidates(self, curves, mses, clusters, sizes):
+        if curves is None or len(curves) == 0:
+            return []
+
+        # Define thresholds and epsilon to prevent division by zero
+        epsilon = 1e-6
+        alpha = 0.1  # Reduced impact of MSE in the score
+        beta = 2  # Increased impact of size in the score
+        size_threshold = 150  # Threshold for size scoring
+        gamma = 2  # Exponential factor for size scoring
+        score_thresh = 1
+
+        # Compute scores for each candidate
+        scored_candidates = [
+            (curve, mse, cluster, size, alpha*-mse + beta * (
+                (size / size_threshold) ** gamma if size > size_threshold else (size / size_threshold)))
+            for curve, mse, cluster, size in zip(curves, mses, clusters, sizes)
+        ]
+
+        # Sort candidates by computed score (higher is better)
+        scored_candidates.sort(key=lambda x: x[4], reverse=True)
+
+        # Select up to two best candidates based on score
+        # Ensuring that the best two scores are selected and that there are at least two good candidates
+        self.print_results(scored_candidates)
+        # if len(scored_candidates) >= 2 and scored_candidates[1][4] > score_thresh:
+        #     best_candidates = scored_candidates[:2]
+        # else:
+        #     best_candidates = []
+
+        return [[curve, mse, cluster, size, score] for curve, mse, cluster, size, score in scored_candidates]
 
     def calculate_road_center(self, curves, image_height):
         if curves[0] is not None and curves[1] is not None:
@@ -244,22 +295,7 @@ class LaneDetectionPolyfit(IControlAlgorithm, IObservable):
             colored_clusters[point[1], point[0]] = colors[label]
         return colored_clusters  # Make sure to return the colored image
 
-    def detect_curves_dbscan(self, img, image_height, image_width):
-        clusters, labels = self.cluster_points(img)
-        # if clusters is None or len(clusters) <= 0:
-        #     return None, None, None, None
-
-
-        if clusters is not None:
-            clusters.sort(key=len, reverse=True)
-
-        cluster_sizes = None
-        curves, mses, clusters = self.fit_polynomials(clusters)
-        if clusters is not None:
-            cluster_sizes = [len(x) for x in clusters if x is not None]
-
-        selected_lane_candidates = self.select_lane_candidates(curves, mses, clusters, cluster_sizes)
-
+    def post_process_with_kalman(self, selected_lane_candidates, image_height, image_width):
         # Get predictions from the Kalman filters for both lanes
         predicted_left, predicted_right = self.predict_lanes()
         # print("Prediction L: ", predicted_left)
@@ -277,8 +313,6 @@ class LaneDetectionPolyfit(IControlAlgorithm, IObservable):
             [[cluster1, lane1, lane_score1], [cluster2, lane2, lane_score2]] = selected_lane_candidates
             x_bottom1 = np.polyval(lane1, image_height)
             x_bottom2 = np.polyval(lane2, image_height)
-            self.right_lane_prediction_counter = 0
-            self.left_lane_prediction_counter = 0
             # print("Lane1:", lane1)
             # print("Lane2:", lane2)
             if x_bottom1 < x_bottom2: #determine right and left lane
@@ -299,43 +333,81 @@ class LaneDetectionPolyfit(IControlAlgorithm, IObservable):
             left_lane, right_lane = self.select_lane_candidates_using_kalman(lanes, predicted_left, predicted_right)
             if left_lane is not None: # Update Kalman, since a left lane was found which aligns with the prediction
                 self.update_kalman_filter(self.kf_left_lane, left_lane)
-                self.left_lane_prediction_counter = 0
             else:
                 left_lane = predicted_left
                 print("Subsitute left lane by kalman prediction")
 
             if right_lane is not None: # Update Kalman, since a right lane was found which aligns with the prediction
                 self.update_kalman_filter(self.kf_right_lane, right_lane)
-                self.right_lane_prediction_counter = 0
             else:
                 right_lane = predicted_right
                 print("Subsitute right lane by kalman prediction")
 
-        if self.right_lane_prediction_counter > 10 or self.left_lane_prediction_counter > 10:
-            return (None, None, None, None)
+        return left_lane, right_lane
 
-        # Calculate the road center based on the selected or predicted lanes
-        road_center = self.calculate_road_center([left_lane, right_lane], image_height)
+
+
+    def detect_curves_dbscan(self, img, image_height, image_width):
+        clusters, labels = self.cluster_points(img)
+        # if clusters is None or len(clusters) <= 0:
+        #     return None, None, None, None
+
 
         if clusters is not None:
-            img = self.color_clusters(img, labels)
+            clusters.sort(key=len, reverse=True)
+
+        cluster_sizes = None
+        curves, mses, clusters = self.fit_polynomials(clusters)
+        if clusters is not None:
+            cluster_sizes = [len(x) for x in clusters if x is not None]
+
+        selected_lane_candidates = self.select_lane_candidates(curves, mses, clusters, cluster_sizes)
+
+        lane1 = None
+        lane2 = None
+        info = None
+        current_time = round(time.time() * 1000)
+        if len(selected_lane_candidates) == 2:
+            [[lane1, mse1, cluster1, size1, score1 ], [lane2, mse2, cluster2, size2, score2]] = selected_lane_candidates
+            info = [current_time, mse1, mse2, size1, size2, score1, score2]
+        elif len(selected_lane_candidates) > 2:
+            first_two_lists = selected_lane_candidates[:2]
+            [[lane1, mse1, cluster1, size1, score1], [lane2, mse2, cluster2, size2, score2]] = first_two_lists
+            info = [current_time, mse1, mse2, size1, size2, score1, score2]
         else:
-            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+            info = [current_time, 0, 0, 0, 0, 0, 0]
 
+        road_center = self.calculate_road_center([lane1, lane2], image_height)
 
-        return (left_lane, right_lane, road_center, img)
+        return (lane1, lane2, road_center, info)
 
+    def print_results(self, selected_lane_candidates):
+        # Header for the output
+        print("{:<10} {:<10} {:<10}".format("MSE", "Size", "Score"))
+        print("-" * 30)  # Print a simple line of dashes for separation
+
+        # Loop through each candidate and print relevant details
+        for candidate in selected_lane_candidates:
+            mse = candidate[1]  # Assuming MSE is the second element in each sublist
+            size = candidate[3]  # Assuming Size is the fourth element in each sublist
+            score = candidate[4]  # Assuming Score is the fifth element in each sublist
+            print(f"{mse:.3f}      {size:.0f}      {score:.3f}")
+        print("-" * 30)  # Print a simple line of dashes for separation
 
     def visualize_curves(self, frame, left_curve, right_curve, image_height):
+        average_curve = None
+        if left_curve is not None and right_curve is not None:
+            average_curve = (left_curve+right_curve)/2
         plot_y = np.linspace(0, image_height - 1, image_height)
-        colors = [(255, 0, 0), (0, 255, 0)]  # Red for left, Green for right
+        colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]  # Red for left, Green for right
 
-        curves = [left_curve, right_curve]
+        curves = [left_curve, right_curve] #average_curve
         for idx, curve in enumerate(curves):
             if curve is not None:
                 plot_x = np.polyval(curve, plot_y)
                 points = np.int32(np.vstack([plot_x, plot_y]).T)
                 cv2.polylines(frame, [points], isClosed=False, color=colors[idx], thickness=5)
+
 
         return frame
 
@@ -425,6 +497,13 @@ class PIDController:
             + self.ki * self.integral
             + self.kd * derivative
         )
+
+        if steering > 1:
+            steering = 1
+
+        if steering < -1:
+            steering = -1
+
 
         self.prev_error = error
 
