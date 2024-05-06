@@ -196,6 +196,6 @@ if __name__ == "__main__":
     #capture()
     #testLaneDetectionDesktop()
     #drivePilotNet()
-    driveLaneDetection()
+    #driveLaneDetection()
     #driveBoth()
-    #capture_lanedetection_poly()
+    capture_lanedetection_poly()
