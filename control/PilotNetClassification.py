@@ -373,6 +373,31 @@ if __name__ == '__main__':
     #              "/home/luca/raspicar/data/29-04-2024_15-21-09",
     #              "/home/luca/raspicar/data/29-04-2024_15-23-31"]
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     data_dirs = ["/home/luca/raspicar/data/29-04-2024_15-16-45",
                  "/home/luca/raspicar/data/29-04-2024_15-19-54",
                  "/home/luca/raspicar/data/29-04-2024_15-22-37",
