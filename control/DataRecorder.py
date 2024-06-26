@@ -62,12 +62,15 @@ class DataRecorder(IObserver):
             frame_time = self.latest_frame_timestamp
             commands = self.latest_commands
             command_time = self.latest_command_timestamp
-            self.latest_frame = None  # Reset the frame to prevent resaving the same image
+
         if frame is not None and commands is not None:
             if abs(frame_time - command_time) <= self.max_time_diff:
                 self.save_frame_with_label(frame, commands)
+                self.latest_frame = None  # Reset the frame to prevent resaving the same image
+                self.latest_commands = None
             else:
                 print("Dismiss Data, Frame and Control Command too async: ", abs(frame_time - command_time))
+
 
     def update(self, data, timestamp):
         with self.lock:
