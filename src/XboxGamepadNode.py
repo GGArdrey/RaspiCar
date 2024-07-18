@@ -1,21 +1,26 @@
 import time
 import pygame
 import zmq
-import json
+from utils.message_utils import create_json_message
 from Node import Node
 
+
 class XboxGamepadNode(Node):
-    def __init__(self, joystick_index=0, input_freq=10, zmq_pub_url="tcp://*:5556"):
+    def __init__(self, joystick_index=0, input_freq=20, zmq_pub_url="tcp://*:5556", pub_topic="gamepad"):
         Node.__init__(self)
         pygame.init()
         pygame.joystick.init()
         self._input_freq = input_freq
         self.joystick_index = joystick_index
         self.zmq_pub_url = zmq_pub_url
+        self.pub_topic = pub_topic
         self.zmq_context = zmq.Context()
         self.zmq_publisher = self.zmq_context.socket(zmq.PUB)
         self.zmq_publisher.bind(self.zmq_pub_url)
         self.connected = self._connect_gamepad(joystick_index)
+
+        # Initialize previous state
+        self.previous_state = self._get_initial_state()
 
     def start(self):
         print("Started Xbox Input Node")
@@ -73,36 +78,57 @@ class XboxGamepadNode(Node):
             self._joystick = None
         self.connected = False
 
+    def _get_initial_state(self):
+        """Get the initial state of the gamepad."""
+        return {
+            "left_stick_x": 0.0,
+            "left_stick_y": 0.0,
+            "right_stick_x": 0.0,
+            "right_stick_y": 0.0,
+            "left_trigger": 0.0,
+            "right_trigger": 0.0,
+            "A": 0,
+            "B": 0,
+            "X": 0,
+            "Y": 0,
+            "left_bumper": 0,
+            "right_bumper": 0,
+            "back": 0,
+            "start": 0,
+            "left_stick_click": 0,
+            "right_stick_click": 0,
+            "dpad_up": 0,
+            "dpad_down": 0,
+            "dpad_left": 0,
+            "dpad_right": 0
+        }
+
     def _publish_gamepad_input(self):
         """Handle the input from the controller."""
-        data = {
-            "left_stick_x": self._joystick.get_axis(0),  # Axis 0: left joystick left-right
-            "left_stick_y": self._joystick.get_axis(1),  # Axis 1: left joystick up-down
-            "right_stick_x": self._joystick.get_axis(3),  # Axis 3: right joystick left-right
-            "right_stick_y": self._joystick.get_axis(4),  # Axis 4: right joystick up-down
-            "left_trigger": self._joystick.get_axis(2),  # Axis 2: left trigger
-            "right_trigger": self._joystick.get_axis(5),  # Axis 5: right trigger
-
-            "A": self._joystick.get_button(0),  # Button 0: A
-            "B": self._joystick.get_button(1),  # Button 1: B
-            "X": self._joystick.get_button(2),  # Button 2: X
-            "Y": self._joystick.get_button(3),  # Button 3: Y
-            "left_bumper": self._joystick.get_button(4),  # Button 4: Left Bumper
-            "right_bumper": self._joystick.get_button(5),  # Button 5: Right Bumper
-            "back": self._joystick.get_button(6),  # Button 6: Back
-            "start": self._joystick.get_button(7),  # Button 7: Start
-            "left_stick_click": self._joystick.get_button(9),  # Button 9: Left Stick Click
-            "right_stick_click": self._joystick.get_button(10),  # Button 10: Right Stick Click
-            "dpad_up": self._joystick.get_button(13),  # Button 13: D-Pad Up
-            "dpad_down": self._joystick.get_button(14),  # Button 14: D-Pad Down
-            "dpad_left": self._joystick.get_button(11),  # Button 11: D-Pad Left
-            "dpad_right": self._joystick.get_button(12)  # Button 12: D-Pad Right
+        current_state = {
+            "left_stick_x": self._joystick.get_axis(0),
+            "left_stick_y": self._joystick.get_axis(1),
+            "right_stick_x": self._joystick.get_axis(3),
+            "right_stick_y": self._joystick.get_axis(4),
+            "left_trigger": self._joystick.get_axis(2),
+            "right_trigger": self._joystick.get_axis(5),
+            "A": self._joystick.get_button(0),
+            "B": self._joystick.get_button(1),
+            "X": self._joystick.get_button(2),
+            "Y": self._joystick.get_button(3),
+            "left_bumper": self._joystick.get_button(4),
+            "right_bumper": self._joystick.get_button(5),
+            "back": self._joystick.get_button(6),
+            "start": self._joystick.get_button(7),
+            "left_stick_click": self._joystick.get_button(9),
+            "right_stick_click": self._joystick.get_button(10),
+            "dpad_up": self._joystick.get_button(13),
+            "dpad_down": self._joystick.get_button(14),
+            "dpad_left": self._joystick.get_button(11),
+            "dpad_right": self._joystick.get_button(12)
         }
 
-        timestamp = time.time()
-        message = {
-            "timestamp": timestamp,
-            "data": data
-        }
-        message_json = json.dumps(message)
-        self.zmq_publisher.send_string(f"controller_state {message_json}")
+        if current_state != self.previous_state:
+            message = create_json_message(current_state, self.pub_topic)
+            self.zmq_publisher.send(message)
+            self.previous_state = current_state
