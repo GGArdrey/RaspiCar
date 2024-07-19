@@ -28,11 +28,11 @@ class CommandInterface:
         #print("sending throttle " + str(value), end="\r\n")
         if self.uart:
             num_bytes = self.uart.write(('drive,' + str(int(value)) + '\n').encode('utf-8'))
-            print("sent throttle, written bytes: ", num_bytes)
+            #print("sent throttle, written bytes: ", num_bytes)
 
     def steer(self, value):
         value = value * 100
         #print("sending steer " + str(value), end="\r\n")
         if self.uart:
             num_bytes = self.uart.write(('steer,' + str(int(value)) + '\n').encode('utf-8'))
-            print("sent steer, written bytes: ", num_bytes)
+            #print("sent steer, written bytes: ", num_bytes)

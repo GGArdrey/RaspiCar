@@ -1,20 +1,17 @@
 # Master Makefile to handle the entire deployment process
 
 # Define default target
-all: upload-control upload-pico upload-to-pico
+all: upload-code upload-to-pico
 
 # Upload files from control/ directory to Raspberry Pi
-upload-control:
-	$(MAKE) -C control/ upload
-
-# Upload files from pico/code/src/ directory to Raspberry Pi
-upload-pico:
-	$(MAKE) -C pico/ upload
+upload-code:
+	ssh pi@raspberrypi.local 'mkdir -p /home/pi/raspicar/src_pi/ && mkdir -p /home/pi/raspicar/src_pico/'
+	scp -r ./src_pi pi@raspberrypi.local:/home/pi/raspicar/
+	scp -r ./src_pico pi@raspberrypi.local:/home/pi/raspicar/
 
 # Upload files from Raspberry Pi to Pi Pico
-# Use absolute path of rshell on the pi
 upload-to-pico:
-	ssh pi@raspberrypi.local 'cd /home/pi/pico/ && /home/pi/.local/bin/rshell cp src/* /pyboard/'
+	ssh pi@raspberrypi.local 'cd /home/pi/raspicar/src_pico/ && /home/pi/.local/bin/rshell cp * /pyboard/'
 
 # List boards connected to Raspberry Pi
 list-boards:

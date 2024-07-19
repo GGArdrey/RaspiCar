@@ -63,7 +63,8 @@ class XboxGamepadTranslatorNode(Node):
 
         # Handle joystick and trigger inputs
         if "left_stick_x" in payload:
-            steering_commands["steer"] = payload["left_stick_x"]
+            steer_value = payload["left_stick_x"]
+            steering_commands["steer"] = 0 if abs(steer_value) <= 0.15 else steer_value #TODO param magic number
         if "right_trigger" in payload:
             steering_commands["throttle"] += payload["right_trigger"]
         if "left_trigger" in payload:

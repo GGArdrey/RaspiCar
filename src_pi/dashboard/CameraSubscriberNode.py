@@ -4,12 +4,12 @@ import numpy as np
 import time
 
 class CameraSubscriberNode:
-    def __init__(self, zmq_sub_url="tcp://localhost:5555"):
+    def __init__(self, zmq_sub_url="tcp://raspberrypi.local:5555"):
         self.zmq_sub_url = zmq_sub_url
         self.zmq_context = zmq.Context()
         self.zmq_subscriber = self.zmq_context.socket(zmq.SUB)
         self.zmq_subscriber.connect(self.zmq_sub_url)
-        self.zmq_subscriber.setsockopt_string(zmq.SUBSCRIBE, 'frame')
+        self.zmq_subscriber.setsockopt_string(zmq.SUBSCRIBE, 'camera')
 
     def start(self):
         while True:

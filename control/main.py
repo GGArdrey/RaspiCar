@@ -34,7 +34,7 @@ def record():
     camera.start()  # Start camera thread
 
 
-    command_interface = CommandInterface() # sends steering commands to pico
+    command_interface = CommandInterface() # sends steering commands to src_pico
     control_manager = ControlManager(command_interface, xbox_input, control_algorithm1 = None, control_algorithm2 = None)
     xbox_input.register_observer(control_manager) #control manager wants to get inputs from controller
     control_manager.start()  # start thread

@@ -2,7 +2,7 @@ from utils.message_utils import create_image_message
 import cv2
 import zmq
 from Node import Node
-
+import time
 
 class CameraNode(Node):
     def __init__(self, camera_source=0, frame_width=None, frame_height=None, zmq_pub_url="tcp://*:5555", pub_topic='camera'):

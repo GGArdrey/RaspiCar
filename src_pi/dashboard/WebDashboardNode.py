@@ -59,7 +59,7 @@ def receive_data():
 Thread(target=receive_data, daemon=True).start()
 
 
-@app.callback(Output('live-image', 'src'),
+@app.callback(Output('live-image', 'src_pi'),
               [Input('interval-component', 'n_intervals')])
 def update_image_src(n):
     global image_data

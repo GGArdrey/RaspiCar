@@ -109,7 +109,6 @@ class DataRecorderNode(Node):
     def _process_steering_commands(self):
         message = self.steering_commands_subscriber.recv_string()
         topic, timestamp, payload = parse_json_message(message)
-        print(timestamp)
 
         if self.recording and "steer" in payload:
             self._pair_and_save_frame(payload, timestamp)
