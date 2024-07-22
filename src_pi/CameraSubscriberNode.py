@@ -14,8 +14,9 @@ class CameraSubscriberNode(Node):
         self.zmq_context = zmq.Context()
         self.zmq_subscriber = self.zmq_context.socket(zmq.SUB)
         self.zmq_subscriber.connect(self.zmq_sub_url)
-        self.zmq_subscriber.setsockopt_string(zmq.SUBSCRIBE, 'camera')
         self.zmq_subscriber.setsockopt(zmq.RCVHWM, 1)  # Set high water mark to 1 to drop old frames
+        self.zmq_subscriber.setsockopt_string(zmq.SUBSCRIBE, 'camera')
+
 
     def start(self):
         while True:

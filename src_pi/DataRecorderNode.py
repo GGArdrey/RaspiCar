@@ -96,11 +96,14 @@ class DataRecorderNode(Node):
         # Camera subscriber
         self.camera_subscriber = self.zmq_context.socket(zmq.SUB)
         self.camera_subscriber.connect(self.camera_sub_url)
+        self.camera_subscriber.setsockopt(zmq.RCVHWM, 1)  # Set high water mark to 1 to drop old frames
         self.camera_subscriber.setsockopt_string(zmq.SUBSCRIBE, self.camera_sub_topic)
+
 
         # Steering commands subscriber
         self.steering_commands_subscriber = self.zmq_context.socket(zmq.SUB)
         self.steering_commands_subscriber.connect(self.gamepad_sub_url)
+        self.steering_commands_subscriber.setsockopt(zmq.RCVHWM, 1)  # Set high water mark to 1 to drop old frames
         self.steering_commands_subscriber.setsockopt_string(zmq.SUBSCRIBE, self.gamepad_steering_sub_topic)
 
         self.poller.register(self.camera_subscriber, zmq.POLLIN)
@@ -142,7 +145,7 @@ class DataRecorderNode(Node):
         steering_angle = steering_data["steer"]
 
         image_path = os.path.join(self.storage_dir, f"{self.image_count}_{steering_angle}.jpg")
-        #cv2.imwrite(image_path, frame)
+        cv2.imwrite(image_path, frame)
         self.log(f"Saved frame {self.image_count} with steering data {steering_angle}.", logging.INFO)
         self.image_count += 1
 
