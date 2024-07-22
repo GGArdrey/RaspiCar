@@ -6,11 +6,13 @@ from utils.message_utils import create_json_message, parse_json_message
 from Node import Node
 from CommandInterface import CommandInterface  # Import the CommandInterface
 
+# TODO should this node start even when no controller command is received?
 
 class ControlFusionNode(Node):
     def __init__(self, control_sub_url="tcp://*:5560", control_sub_topic="pilotnetc_steering_commands",
                  gamepad_sub_url="tcp://*:5557", gamepad_sub_topic="gamepad_steering_commands",
-                 zmq_pub_url="tcp://*:5570", zmq_pub_topic="fused_steering_commands", override_duration=3, log_level=logging.INFO):
+                 zmq_pub_url="tcp://*:5570", zmq_pub_topic="fused_steering_commands", override_duration=3,
+                 log_level=logging.INFO):
         super().__init__(log_level=log_level)
         self.zmq_context = zmq.Context()
 
@@ -35,9 +37,6 @@ class ControlFusionNode(Node):
         self.poller.register(self.gamepad_subscriber, zmq.POLLIN)
 
         # Initialize last received messages and override tracking
-        self.current_control_msg = None
-        self.last_gamepad_msg = None
-        self.current_gamepad_msg = None
         self.override_end_times = {
             "steer": 0,
             "throttle": 0,
@@ -55,6 +54,8 @@ class ControlFusionNode(Node):
             "sensors_enable": 0,
             "sensors_disable": 0
         }
+        self.current_control_msg = None
+        self.current_gamepad_msg = dict(self.default_values)
 
         # Initialize CommandInterface for UART communication
         self.command_interface = CommandInterface()
@@ -74,13 +75,11 @@ class ControlFusionNode(Node):
             self.execute_commands(fused_msg)
             self.publish_message(fused_msg)
 
-
     def _process_gamepad_message(self, current_time):
         message = self.gamepad_subscriber.recv_string()
         _, timestamp, payload = parse_json_message(message)
         self.current_gamepad_msg = payload
-        self.update_override_end_times(self.current_gamepad_msg, current_time)
-        self.last_gamepad_msg = self.current_gamepad_msg
+        self.update_override_end_times(current_time)
         latency = time.time() - timestamp
         self.log(f"Total time to process gamepad: {latency}", logging.DEBUG)
         if latency > 0.2:
@@ -89,21 +88,16 @@ class ControlFusionNode(Node):
     def _process_control_message(self, current_time):
         message = self.control_subscriber.recv_string()
         _, timestamp, payload = parse_json_message(message)
-        self.update_override_end_times(self.current_gamepad_msg, current_time)
+        self.update_override_end_times(current_time)
         self.current_control_msg = payload
         latency = time.time() - timestamp
         self.log(f"Total time to process image: {latency}", logging.DEBUG)
         if latency > 0.2:
             self.log(f"High latency detected from processing image: {latency}", logging.WARNING)
 
-
-    def update_override_end_times(self, gamepad_msg, current_time):
-        """Update override end times for fields based on gamepad input differences."""
-        if not self.last_gamepad_msg:
-            self.last_gamepad_msg = {key: self.default_values[key] for key in self.default_values}
-
+    def update_override_end_times(self, current_time):
         for key in self.override_end_times:
-            if (gamepad_msg.get(key) != self.last_gamepad_msg.get(key)) or (gamepad_msg.get(key) != self.default_values.get(key)):
+            if self.current_gamepad_msg.get(key) != self.default_values.get(key):
                 self.override_end_times[key] = current_time + self.override_duration
 
     def fuse_messages(self, current_time):
@@ -112,8 +106,8 @@ class ControlFusionNode(Node):
 
         for key in self.default_values:
             # Use gamepad value if within override duration
-            if self.last_gamepad_msg and current_time < self.override_end_times[key]:
-                fused_msg[key] = self.last_gamepad_msg[key]
+            if self.current_gamepad_msg and current_time <= self.override_end_times[key]:
+                fused_msg[key] = self.current_gamepad_msg[key]
             # Otherwise, use control algorithm value
             elif self.current_control_msg:
                 fused_msg[key] = self.current_control_msg[key]

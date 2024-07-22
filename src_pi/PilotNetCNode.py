@@ -40,6 +40,7 @@ class PilotNetCNode(Node):
         self.zmq_subscriber = self.zmq_context.socket(zmq.SUB)
         self.zmq_subscriber.connect(self.camera_sub_url)
         self.zmq_subscriber.setsockopt_string(zmq.SUBSCRIBE, self.camera_sub_topic)
+        #self.zmq_subscriber.setsockopt(zmq.RCVHWM, 1)  # Set high water mark to 1 to drop old frames
 
 
 

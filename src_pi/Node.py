@@ -35,9 +35,9 @@ class Node:
         node_instance = node_class(*args)  # Create an instance of the specified node class with given arguments
         try:
             node_instance.start()  # Start the node's main functionality
-            node_instance.log(f"{node_class.__name__} started.", logging.INFO)
+            node_instance.log(f"Node started.", logging.INFO)
         except Exception as e:
             node_instance.log(f"{e}.", logging.ERROR)
         finally:
             node_instance.release()  # Ensure resources are released when done or if an error occurs
-            node_instance.log(f"{node_class.__name__} released.", logging.INFO)
+            node_instance.log(f"Node released.", logging.INFO)

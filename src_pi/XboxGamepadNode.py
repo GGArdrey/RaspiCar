@@ -127,7 +127,7 @@ class XboxGamepadNode(Node):
             "dpad_right": self._joystick.get_button(12)
         }
 
-        if current_state != self.previous_state:
-            message = create_json_message(current_state, self.pub_topic)
-            self.zmq_publisher.send(message)
-            self.previous_state = current_state
+        #if current_state != self.previous_state:
+        message = create_json_message(current_state, self.pub_topic)
+        self.zmq_publisher.send(message)
+        self.previous_state = current_state

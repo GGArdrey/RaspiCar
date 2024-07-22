@@ -15,14 +15,15 @@ class CameraSubscriberNode(Node):
         self.zmq_subscriber = self.zmq_context.socket(zmq.SUB)
         self.zmq_subscriber.connect(self.zmq_sub_url)
         self.zmq_subscriber.setsockopt_string(zmq.SUBSCRIBE, 'camera')
+        self.zmq_subscriber.setsockopt(zmq.RCVHWM, 1)  # Set high water mark to 1 to drop old frames
 
     def start(self):
         while True:
             try:
                 message = self.zmq_subscriber.recv_multipart()
                 topic, image, timestamp = parse_image_message(message)
-                t = time.time()
-                self.log("Total time to receive image: {t - timestamp}", logging.DEBUG)
+                dt = time.time() - timestamp
+                self.log(f"Total time to receive image: {dt}", logging.DEBUG)
                 if image is not None:
                     cv2.imshow('Received Camera Feed', image)
                     if cv2.waitKey(1) & 0xFF == ord('q'):  # Press 'q' to exit
@@ -40,7 +41,7 @@ class CameraSubscriberNode(Node):
 
 
 if __name__ == "__main__":
-    subscriber_node = CameraSubscriberNode()
+    subscriber_node = CameraSubscriberNode(log_level=logging.DEBUG)
     try:
         subscriber_node.start()
     except KeyboardInterrupt:
