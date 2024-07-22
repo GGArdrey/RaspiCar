@@ -2,10 +2,11 @@ import zmq
 import time
 from utils.message_utils import create_json_message, parse_json_message
 from Node import Node
+import logging
 
 class XboxGamepadTranslatorNode(Node):
-    def __init__(self, zmq_sub_url="tcp://*:5556", zmq_sub_topic="gamepad", zmq_pub_url="tcp://*:5557"):
-        super().__init__()
+    def __init__(self, zmq_sub_url="tcp://*:5556", zmq_sub_topic="gamepad", zmq_pub_url="tcp://*:5557", log_level=logging.INFO):
+        super().__init__(log_level=log_level)
         self.zmq_context = zmq.Context()
         self.zmq_subscriber = self.zmq_context.socket(zmq.SUB)
         self.zmq_subscriber.connect(zmq_sub_url)
@@ -32,13 +33,13 @@ class XboxGamepadTranslatorNode(Node):
                 if topic == "gamepad":
                     steering_commands, function_commands = self.translate_gamepad_input(payload)
                     if steering_commands:
-                        self.zmq_publisher.send(create_json_message(steering_commands, "gamepad_steering_commands"))
+                        self.zmq_publisher.send(create_json_message(steering_commands, "gamepad_steering_commands", timestamp))
                     if function_commands:
-                        self.zmq_publisher.send(create_json_message(function_commands, "gamepad_function_commands"))
+                        self.zmq_publisher.send(create_json_message(function_commands, "gamepad_function_commands", timestamp))
             except zmq.ZMQError as e:
-                print(f"ZMQ error: {e}")
+                self.log(f"ZMQ error: {e}", logging.ERROR)
             except Exception as e:
-                print(f"Error processing message: {e}")
+                self.log(f"{e}", logging.ERROR)
 
     def release(self):
         self.zmq_publisher.close()

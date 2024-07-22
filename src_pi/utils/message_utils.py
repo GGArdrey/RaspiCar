@@ -2,7 +2,7 @@ import json
 import time
 import cv2
 import numpy as np
-
+from utils.timer_utils import timer
 
 def ensure_json_serializable(value):
     if isinstance(value, np.ndarray):
@@ -56,20 +56,16 @@ def parse_json_message(message):
     return topic, timestamp, payload
 
 
-def create_image_message(image, topic, timestamp=None, encoding=".png"):
+def create_image_message(image, topic, timestamp=None):
     if timestamp is None:
         timestamp = time.time()
-
-    _, buffer = cv2.imencode(encoding, image)
     timestamp = str(timestamp).encode('utf-8')
-    marshalled_message = [topic.encode('utf-8'), buffer.tobytes(), timestamp]
+    marshalled_message = [topic.encode('utf-8'), image.tobytes(), timestamp]
     return marshalled_message
 
-
-def parse_image_message(message):
+def parse_image_message(message, frame_height=640, frame_width=360):
     topic, image_data, timestamp = message
-    np_frame = np.frombuffer(image_data, dtype=np.uint8)
-    image = cv2.imdecode(np_frame, cv2.IMREAD_COLOR)
+    image = np.frombuffer(image_data, dtype=np.uint8).reshape((frame_width, frame_height, 3))
     topic = topic.decode('utf-8')
     timestamp = float(timestamp.decode('utf-8'))
     return topic, image, timestamp

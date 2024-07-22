@@ -3,11 +3,13 @@ import pygame
 import zmq
 from utils.message_utils import create_json_message
 from Node import Node
+import logging
+pygame.mixer.pre_init(frequency=48000, buffer=2048)
 
 
 class XboxGamepadNode(Node):
-    def __init__(self, joystick_index=0, input_freq=20, zmq_pub_url="tcp://*:5556", pub_topic="gamepad"):
-        Node.__init__(self)
+    def __init__(self, joystick_index=0, input_freq=20, zmq_pub_url="tcp://*:5556", pub_topic="gamepad", log_level=logging.INFO):
+        super().__init__(log_level=log_level)
         pygame.init()
         pygame.joystick.init()
         self._input_freq = input_freq
@@ -23,7 +25,6 @@ class XboxGamepadNode(Node):
         self.previous_state = self._get_initial_state()
 
     def start(self):
-        print("Started Xbox Input Node")
         while True:
             for event in pygame.event.get():  # Get the list of all events
                 if event.type == pygame.JOYDEVICEREMOVED:
@@ -34,7 +35,7 @@ class XboxGamepadNode(Node):
                 time.sleep(1)  # Wait a bit before trying to reconnect
                 self.connected = self._connect_gamepad(self.joystick_index)
                 if not self.connected:
-                    print("Attempt to reconnect controller failed.")
+                    self.log("Attempt to reconnect controller failed.", logging.ERROR)
                     continue  # Skip further processing if not connected
 
             self._publish_gamepad_input()
@@ -44,7 +45,6 @@ class XboxGamepadNode(Node):
         pygame.quit()
         self.zmq_publisher.close()
         self.zmq_context.term()
-        print("Xbox Input Node released and ZeroMQ publisher closed.")
 
     def _rumble_gamepad(self):
         """Rumble the connected controller to provide feedback."""
@@ -62,17 +62,16 @@ class XboxGamepadNode(Node):
                 self._joystick.init()
                 self.connected = True
                 self._rumble_gamepad()
-                print("Controller connected.")
+                self.log("Controller connected.", logging.INFO)
                 return True
             except pygame.error as e:
-                print(f"Controller connection error: {e}")
+                self.log(f"Controller connection error: {e}", logging.ERROR)
         else:
-            print(f"No controller found at index {joystick_index}.")
+            self.log(f"No controller found at index {joystick_index}.", logging.ERROR)
         return False
 
     def _handle_disconnect(self):
         """Handle controller disconnection. Sets state of self.connected to false to indicate"""
-        print("Controller disconnected.")
         if self._joystick:
             self._joystick.quit()  # Properly close the joystick instance
             self._joystick = None

@@ -1,3 +1,5 @@
+import logging
+
 import zmq
 import time
 from utils.message_utils import create_json_message, parse_json_message
@@ -8,8 +10,8 @@ from CommandInterface import CommandInterface  # Import the CommandInterface
 class ControlFusionNode(Node):
     def __init__(self, control_sub_url="tcp://*:5560", control_sub_topic="pilotnetc_steering_commands",
                  gamepad_sub_url="tcp://*:5557", gamepad_sub_topic="gamepad_steering_commands",
-                 zmq_pub_url="tcp://*:5570", zmq_pub_topic="fused_steering_commands", override_duration=3):
-        super().__init__()
+                 zmq_pub_url="tcp://*:5570", zmq_pub_topic="fused_steering_commands", override_duration=3, log_level=logging.INFO):
+        super().__init__(log_level=log_level)
         self.zmq_context = zmq.Context()
 
         # Control algorithm subscriber
@@ -59,44 +61,41 @@ class ControlFusionNode(Node):
 
     def start(self):
         while True:
-            try:
-                # Poll for new messages from both subscribers
-                events = dict(self.poller.poll())
+            events = dict(self.poller.poll())
+            current_time = time.time()
 
-                current_time = time.time()
+            if self.gamepad_subscriber in events:
+                self._process_gamepad_message(current_time)
 
-                # Check for gamepad input
-                if self.gamepad_subscriber in events:
-                    message = self.gamepad_subscriber.recv_string()
-                    topic, timestamp, payload = parse_json_message(message)
-                    self.current_gamepad_msg = payload
+            if self.control_subscriber in events:
+                self._process_control_message(current_time)
 
-                    # Compare current and last gamepad messages to detect differences
-                    self.update_override_end_times(self.current_gamepad_msg, current_time)
+            fused_msg = self.fuse_messages(current_time)
+            self.execute_commands(fused_msg)
+            self.publish_message(fused_msg)
 
-                    # Update the last gamepad message
-                    self.last_gamepad_msg = self.current_gamepad_msg
 
-                # Check for control algorithm input
-                if self.control_subscriber in events:
-                    message = self.control_subscriber.recv_string()
-                    topic, timestamp, payload = parse_json_message(message)
-                    self.update_override_end_times(self.current_gamepad_msg, current_time)
-                    self.current_control_msg = payload
+    def _process_gamepad_message(self, current_time):
+        message = self.gamepad_subscriber.recv_string()
+        _, timestamp, payload = parse_json_message(message)
+        self.current_gamepad_msg = payload
+        self.update_override_end_times(self.current_gamepad_msg, current_time)
+        self.last_gamepad_msg = self.current_gamepad_msg
+        latency = time.time() - timestamp
+        self.log(f"Total time to process gamepad: {latency}", logging.DEBUG)
+        if latency > 0.2:
+            self.log(f"High latency detected from processing gamepad: {latency}", logging.WARNING)
 
-                # Create the fused message
-                fused_msg = self.fuse_messages(current_time)
+    def _process_control_message(self, current_time):
+        message = self.control_subscriber.recv_string()
+        _, timestamp, payload = parse_json_message(message)
+        self.update_override_end_times(self.current_gamepad_msg, current_time)
+        self.current_control_msg = payload
+        latency = time.time() - timestamp
+        self.log(f"Total time to process image: {latency}", logging.DEBUG)
+        if latency > 0.2:
+            self.log(f"High latency detected from processing image: {latency}", logging.WARNING)
 
-                # Execute commands via UART
-                self.execute_commands(fused_msg)
-
-                # Publish the fused message
-                self.publish_message(fused_msg)
-
-            except zmq.ZMQError as e:
-                print(f"ZMQ error: {e}")
-            except Exception as e:
-                print(f"Error processing message: {e}")
 
     def update_override_end_times(self, gamepad_msg, current_time):
         """Update override end times for fields based on gamepad input differences."""

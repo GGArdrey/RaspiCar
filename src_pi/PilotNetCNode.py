@@ -1,13 +1,21 @@
 from utils.timer_utils import timer
 from utils.pilotnet_utils import resize_and_crop_image
 import numpy as np
+import time
 from tflite_runtime.interpreter import Interpreter, load_delegate
 import zmq
 from utils.message_utils import create_json_message, parse_image_message
 import json
-class PilotNetCNode():
+import logging
+from Node import Node
+class PilotNetCNode(Node):
 
-    def __init__(self, zmq_pub_url="tcp://*:5560", zmq_pub_topic = "pilotnetc_steering_commands", camera_sub_url="tcp://*:5555", camera_sub_topic="camera"):
+    def __init__(self, zmq_pub_url="tcp://*:5560",
+                 zmq_pub_topic = "pilotnetc_steering_commands",
+                 camera_sub_url="tcp://*:5555",
+                 camera_sub_topic="camera",
+                 log_level=logging.INFO):
+        super().__init__(log_level=log_level)
         self.latest_frame = None
         # Load the Edge TPU delegate
         self.interpreter = Interpreter(
@@ -40,19 +48,20 @@ class PilotNetCNode():
             try:
                 message = self.zmq_subscriber.recv_multipart()
                 topic, image, timestamp = parse_image_message(message)
-                self.predict(image)
+                t = time.time()
+                print("Time to receive image: ", t - timestamp)
+                self.predict(image,timestamp)
             except zmq.ZMQError as e:
                 print(f"ZMQ error: {e}")
             except Exception as e:
                 print(f"Error Predicting Steering Angle: {e}")
 
-    def stop(self):
+    def release(self):
         self.zmq_publisher.close()
         self.zmq_subscriber.close()
         self.zmq_context.term()
 
-
-    def predict(self, frame):
+    def predict(self, frame, timestamp):
         frame = resize_and_crop_image(frame)
         frame = np.array(frame, dtype=np.float32)
 
@@ -88,10 +97,9 @@ class PilotNetCNode():
             "overall_predictions": overall_predictions
         }
 
-        print(weighted_steering_value)
-        print("-" * 20)
+        self.log(f"Steering Prediction: {weighted_steering_value}", logging.INFO)
 
-        message = create_json_message(payload, self.zmq_pub_topic)
+        message = create_json_message(payload, self.zmq_pub_topic, timestamp=timestamp) #TODO change timestamp
         self.zmq_publisher.send(message)
 
 if __name__ == "__main__":

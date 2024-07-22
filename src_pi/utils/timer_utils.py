@@ -1,5 +1,9 @@
 import time
 from contextlib import contextmanager
+import logging
+
+logger = logging.getLogger("Stopwatch")
+logger.setLevel(logging.DEBUG)
 
 @contextmanager
 def timer(label):
@@ -9,4 +13,4 @@ def timer(label):
     finally:
         end = time.perf_counter()
         elapsed_time = end - start
-        print(f"{label}: {format(elapsed_time, '.5f')} seconds")
+        logger.debug(f"{label}: {format(elapsed_time, '.5f')} seconds")

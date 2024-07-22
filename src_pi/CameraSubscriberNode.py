@@ -1,10 +1,15 @@
+import logging
+
 import cv2
 import zmq
-import numpy as np
 import time
+from utils.message_utils import parse_image_message
+from Node import Node
 
-class CameraSubscriberNode:
-    def __init__(self, zmq_sub_url="tcp://raspberrypi.local:5555"):
+
+class CameraSubscriberNode(Node):
+    def __init__(self, zmq_sub_url="tcp://raspberrypi.local:5555", log_level=logging.INFO):
+        super().__init__(log_level=log_level)
         self.zmq_sub_url = zmq_sub_url
         self.zmq_context = zmq.Context()
         self.zmq_subscriber = self.zmq_context.socket(zmq.SUB)
@@ -14,24 +19,25 @@ class CameraSubscriberNode:
     def start(self):
         while True:
             try:
-                topic, frame_data, timestamp = self.zmq_subscriber.recv_multipart()
-                np_frame = np.frombuffer(frame_data, dtype=np.uint8)
-                frame = cv2.imdecode(np_frame, cv2.IMREAD_COLOR)
-                if frame is not None:
-                    cv2.imshow('Received Camera Feed', frame)
+                message = self.zmq_subscriber.recv_multipart()
+                topic, image, timestamp = parse_image_message(message)
+                t = time.time()
+                self.log("Total time to receive image: {t - timestamp}", logging.DEBUG)
+                if image is not None:
+                    cv2.imshow('Received Camera Feed', image)
                     if cv2.waitKey(1) & 0xFF == ord('q'):  # Press 'q' to exit
                         break
                 else:
-                    print("Camera Subscriber Node: Error decoding frame.")
+                    self.log("Camera Subscriber Node: Error decoding frame.", logging.ERROR)
             except Exception as e:
-                print(f"Camera Subscriber Node: Error receiving frame: {e}")
+                self.log(f"Error receiving frame: {e}", logging.ERROR)
                 break
 
     def release(self):
         self.zmq_subscriber.close()
         self.zmq_context.term()
         cv2.destroyAllWindows()
-        print("Camera Subscriber Node released and ZeroMQ subscriber closed.")
+
 
 if __name__ == "__main__":
     subscriber_node = CameraSubscriberNode()

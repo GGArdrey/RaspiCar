@@ -2,7 +2,7 @@ import cv2
 import os
 import zmq
 from utils.message_utils import parse_image_message, parse_json_message
-import numpy as np
+import logging
 from datetime import datetime
 from Node import Node
 
@@ -12,8 +12,9 @@ class DataRecorderNode(Node):
                  gamepad_sub_url="tcp://localhost:5557",
                  gamepad_function_sub_topic="function_commands",
                  gamepad_steering_sub_topic="steering_commands",
-                 save_dir='/home/pi/data/'):
-        super().__init__()
+                 save_dir='/home/pi/data/',
+                 log_level=logging.INFO):
+        super().__init__(log_level=log_level)
         self.camera_sub_url = camera_sub_url
         self.camera_sub_topic = camera_sub_topic
         self.gamepad_sub_url = gamepad_sub_url
@@ -52,32 +53,26 @@ class DataRecorderNode(Node):
         self.recording = False
 
     def start(self):
-        print("Data Recorder started...")
-        try:
-            while True:
-                events = dict(self.poller.poll())
+        while True:
+            events = dict(self.poller.poll())
 
-                if self.function_commands_subscriber in events:
-                    self._process_function_commands()
+            if self.function_commands_subscriber in events:
+                self._process_function_commands()
 
-                if self.recording:
-                    if self.camera_subscriber in events:
-                        self._process_camera_frame()
+            if self.recording:
+                if self.camera_subscriber in events:
+                    self._process_camera_frame()
 
-                    if self.steering_commands_subscriber in events:
-                        self._process_steering_commands()
+                if self.steering_commands_subscriber in events:
+                    self._process_steering_commands()
 
-        except KeyboardInterrupt:
-            print("Data Recorder interrupted.")
-        finally:
-            self.release()
+
 
     def release(self):
         self.camera_subscriber.close()
         self.function_commands_subscriber.close()
         self.steering_commands_subscriber.close()
         self.zmq_context.term()
-        print("Data Recorder released and ZeroMQ subscribers closed.")
 
     def _process_camera_frame(self):
         message = self.camera_subscriber.recv_multipart()
@@ -91,7 +86,7 @@ class DataRecorderNode(Node):
 
         if payload["start_data_recording"] == 1:
             if not self.recording:
-                print("Recording started...")
+                self.log("Recording started...", logging.INFO)
                 self.setup_recording_dir()
                 self.recording = True
                 self.image_count = 0  # Reset counter
@@ -100,7 +95,7 @@ class DataRecorderNode(Node):
                 self.poller.register(self.steering_commands_subscriber, zmq.POLLIN)
         elif payload["stop_data_recording"] == 1:
             if self.recording:
-                print("Recording stopped...")
+                self.log("Recording stopped...", logging.INFO)
                 self.recording = False
                 # Unregister the camera and steering subscribers from the poller
                 self.poller.unregister(self.camera_subscriber)
@@ -130,7 +125,7 @@ class DataRecorderNode(Node):
 
         image_path = os.path.join(self.storage_dir, f"{self.image_count}_{steering_angle}.jpg")
         cv2.imwrite(image_path, frame)
-        print(f"Saved frame {self.image_count} with steering data {steering_angle}.")
+        self.log(f"Saved frame {self.image_count} with steering data {steering_angle}.", logging.INFO)
         self.image_count += 1
 
 # Example usage:
