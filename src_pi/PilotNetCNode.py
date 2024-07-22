@@ -48,8 +48,6 @@ class PilotNetCNode(Node):
             try:
                 message = self.zmq_subscriber.recv_multipart()
                 topic, image, timestamp = parse_image_message(message)
-                t = time.time()
-                print("Time to receive image: ", t - timestamp)
                 self.predict(image,timestamp)
             except zmq.ZMQError as e:
                 print(f"ZMQ error: {e}")
@@ -65,10 +63,14 @@ class PilotNetCNode(Node):
         frame = resize_and_crop_image(frame)
         frame = np.array(frame, dtype=np.float32)
 
-        with timer("Inference Time"):
+        with timer("Inference Time") as get_elapsed_time:
             self.interpreter.set_tensor(self.input_details[0]['index'], [frame])
             self.interpreter.invoke()
             overall_predictions = self.interpreter.get_tensor(self.output_details[0]['index'])[0]
+
+        elapsed_time = get_elapsed_time()
+        self.log(f"Inference Time: {elapsed_time}", logging.DEBUG)
+
 
         predicted_class = np.argmax(overall_predictions)
         predicted_steering_value = self.classes[predicted_class]
@@ -97,7 +99,7 @@ class PilotNetCNode(Node):
             "overall_predictions": overall_predictions
         }
 
-        self.log(f"Steering Prediction: {weighted_steering_value}", logging.INFO)
+        self.log(f"Steering Prediction: {weighted_steering_value}", logging.DEBUG)
 
         message = create_json_message(payload, self.zmq_pub_topic, timestamp=timestamp) #TODO change timestamp
         self.zmq_publisher.send(message)

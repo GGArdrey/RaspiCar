@@ -1,8 +1,6 @@
 import json
 import time
-import cv2
 import numpy as np
-from utils.timer_utils import timer
 
 def ensure_json_serializable(value):
     if isinstance(value, np.ndarray):
