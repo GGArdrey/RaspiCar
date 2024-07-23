@@ -19,7 +19,7 @@ list-boards:
 
 # Open REPL session on Pi Pico through Raspberry Pi
 open-shell:
-	ssh pi@raspberrypi.local '/home/pi/.local/bin/rshell repl'
+	ssh pi@raspberrypi.local 'picocom -b 115200 /dev/ttyACM0'
 
 copy:
 	scp -r pi@raspberrypi.local:/home/pi/data/* ./data/

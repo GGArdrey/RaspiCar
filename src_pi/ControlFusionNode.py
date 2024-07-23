@@ -123,13 +123,13 @@ class ControlFusionNode(Node):
         if "throttle" in message:
             self.command_interface.throttle(message["throttle"])
         if "sensors_enable" in message and message["sensors_enable"]:
-            self.command_interface.sensor_toggle()
+            self.command_interface.sensors_enable()
         if "sensors_disable" in message and message["sensors_disable"]:
-            self.command_interface.sensor_toggle()
+            self.command_interface.sensors_disable()
         if "emergency_stop" in message and message["emergency_stop"]:
-            self.command_interface.stop()
+            self.command_interface.emergency_stop()
         if "reset_emergency_stop" in message and message["reset_emergency_stop"]:
-            self.command_interface.stop()  # or handle reset differently if needed
+            self.command_interface.reset_emergency_stop()  # or handle reset differently if needed
 
     def publish_message(self, message):
         """Publish the fused message."""
