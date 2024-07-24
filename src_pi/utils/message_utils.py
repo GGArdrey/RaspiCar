@@ -1,6 +1,8 @@
 import json
 import time
 import numpy as np
+import cv2
+
 
 def ensure_json_serializable(value):
     if isinstance(value, np.ndarray):
@@ -64,6 +66,34 @@ def create_image_message(image, topic, timestamp=None):
 def parse_image_message(message, frame_height=640, frame_width=360):
     topic, image_data, timestamp = message
     image = np.frombuffer(image_data, dtype=np.uint8).reshape((frame_width, frame_height, 3))
+    topic = topic.decode('utf-8')
+    timestamp = float(timestamp.decode('utf-8'))
+    return topic, image, timestamp
+
+
+def create_compressed_image_message(image, topic, timestamp=None):
+    if timestamp is None:
+        timestamp = time.time()
+    timestamp = str(timestamp).encode('utf-8')
+
+    # Compress the image using JPEG compression with a quality factor of 90
+    success, compressed_image = cv2.imencode('.jpg', image, [cv2.IMWRITE_JPEG_QUALITY, 90])
+    if not success:
+        raise ValueError("Image compression failed")
+
+    marshalled_message = [topic.encode('utf-8'), compressed_image.tobytes(), timestamp]
+    return marshalled_message
+
+
+def parse_compressed_image_message(message, frame_height=640, frame_width=360):
+    topic, compressed_image_data, timestamp = message
+
+    # Decompress the image
+    compressed_image_array = np.frombuffer(compressed_image_data, dtype=np.uint8)
+    image = cv2.imdecode(compressed_image_array, cv2.IMREAD_COLOR)
+    if image is None:
+        raise ValueError("Image decompression failed")
+
     topic = topic.decode('utf-8')
     timestamp = float(timestamp.decode('utf-8'))
     return topic, image, timestamp

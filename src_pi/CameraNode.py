@@ -1,4 +1,4 @@
-from utils.message_utils import create_image_message
+from utils.message_utils import create_image_message, create_compressed_image_message
 import cv2
 import zmq
 from Node import Node
@@ -19,6 +19,7 @@ class CameraNode(Node):
 
         self.zmq_pub_url = zmq_pub_url
         self.pub_topic = pub_topic
+        self.pub_topic_compressed = pub_topic + "_compressed"
         self.zmq_context = zmq.Context()
         self.zmq_publisher = self.zmq_context.socket(zmq.PUB)
         self.zmq_publisher.setsockopt(zmq.SNDHWM, 1)  # Set high water mark to 1 to drop old frames
@@ -32,8 +33,10 @@ class CameraNode(Node):
             ret, frame = self.cap.read()
             if ret:
                 message = create_image_message(frame, self.pub_topic)
+                message_compressed = create_compressed_image_message(frame, self.pub_topic_compressed)
                 try:
                     self.zmq_publisher.send_multipart(message, flags=zmq.NOBLOCK)
+                    self.zmq_publisher.send_multipart(message_compressed, flags=zmq.NOBLOCK)
                 except zmq.Again:
                     self.log("Publisher queue is full, dropping frame.", logging.WARNING)
             else:
