@@ -1,14 +1,17 @@
 import cv2
 import numpy as np
-import time
 import zmq
-import threading
 import logging
 from utils.timer_utils import timer
-from utils.message_utils import create_json_message, parse_image_message, create_image_message, create_compressed_image_message
+from utils.message_utils import (
+    create_json_message,
+    parse_image_message,
+    create_compressed_image_message
+)
 from Node import Node
 from filterpy.kalman import KalmanFilter
 from sklearn.cluster import DBSCAN
+
 
 class LaneDetectionNode(Node):
     def __init__(self, zmq_pub_url="tcp://*:5561",
@@ -62,37 +65,43 @@ class LaneDetectionNode(Node):
     def process_frame(self, frame, timestamp):
         with timer("LaneDetectionNode.process_frame Execution"):
             img_color = self.resize_and_crop_image(frame)
-            img = cv2.cvtColor(img_color, cv2.COLOR_BGR2GRAY)
-            img = self.denoise_frame(img)
-            img = self.detect_edges(img)
+            img_gray = cv2.cvtColor(img_color, cv2.COLOR_BGR2GRAY)
+            img_denoised = self.denoise_frame(img_gray)
+            img_edges = self.detect_edges(img_denoised)
 
-            left_lines, right_lines, road_center, info = self.detect_curves_dbscan(img, 66, 200)
+            left_lines, right_lines, road_center, info = self.detect_curves_dbscan(img_edges, 66, 200)
 
-            steering_commands = {
-                "steer": 0,
-                "throttle": 0,
-                "emergency_stop": 0,
-                "reset_emergency_stop": 0,
-                "sensors_enable": 0,
-                "sensors_disable": 0
-            }
-
-            if road_center is not None:
-                steering_commands["steer"] = self.pid_controller.compute_steering(road_center, 200)
+            steering_commands = self.generate_steering_commands(road_center)
 
             self.log(f"Steering Prediction: {steering_commands['steer']}", logging.DEBUG)
-            message = create_json_message(steering_commands, self.zmq_pub_topic, timestamp=timestamp)
-            self.zmq_publisher.send(message)
+            self.publish_steering_commands(steering_commands, timestamp)
 
+            img_color = self.overlay_visuals(img_color, img_edges, left_lines, right_lines, road_center)
 
-            img_color = self.visualize_curves(img_color, left_lines, right_lines, 66)
-            img_color = self.visualize_center(img_color, road_center, 66)
-            img_canny_color = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-            img_color = cv2.addWeighted(img_canny_color, 1, img_color, 1, 0)
+            self.publish_camera_frame(img_color, timestamp)
 
-            message = create_compressed_image_message(img_color, self.pub_camera_topic)
-            self.zmq_camera_publisher.send_multipart(message, flags=zmq.NOBLOCK)
+    def generate_steering_commands(self, road_center):
+        commands = {
+            "steer": 0,
+            "throttle": 0,
+            "emergency_stop": 0,
+            "reset_emergency_stop": 0,
+            "sensors_enable": 0,
+            "sensors_disable": 0
+        }
 
+        if road_center is not None:
+            commands["steer"] = self.pid_controller.compute_steering(road_center, 200)
+
+        return commands
+
+    def publish_steering_commands(self, commands, timestamp):
+        message = create_json_message(commands, self.zmq_pub_topic, timestamp=timestamp)
+        self.zmq_publisher.send(message)
+
+    def publish_camera_frame(self, frame, timestamp):
+        message = create_compressed_image_message(frame, self.pub_camera_topic, timestamp)
+        self.zmq_camera_publisher.send_multipart(message, flags=zmq.NOBLOCK)
 
     def resize_and_crop_image(self, image, target_width=200, target_height=66):
         height, width = image.shape[:2]
@@ -113,7 +122,7 @@ class LaneDetectionNode(Node):
         points = cv2.findNonZero(img)
         if points is None:
             return None, None
-        dbscan = DBSCAN(eps=15, min_samples=10).fit(points[:, 0, :])
+        dbscan = DBSCAN(eps=5, min_samples=10).fit(points[:, 0, :])
         labels = dbscan.labels_
         unique_labels = set(labels)
         if -1 in unique_labels:
@@ -148,7 +157,8 @@ class LaneDetectionNode(Node):
         size_threshold = 150
         gamma = 2
         scored_candidates = [
-            (curve, mse, cluster, size, alpha * -mse + beta * ((size / size_threshold) ** gamma if size > size_threshold else (size / size_threshold)))
+            (curve, mse, cluster, size, alpha * -mse + beta * (
+                (size / size_threshold) ** gamma if size > size_threshold else (size / size_threshold)))
             for curve, mse, cluster, size in zip(curves, mses, clusters, sizes)
         ]
         scored_candidates.sort(key=lambda x: x[4], reverse=True)
@@ -169,42 +179,58 @@ class LaneDetectionNode(Node):
         curves, mses, clusters = self.fit_polynomials(clusters)
         cluster_sizes = [len(x) for x in clusters if x is not None]
         selected_lane_candidates = self.select_lane_candidates(curves, mses, clusters, cluster_sizes)
-        lane1, lane2, info = None, None, None
+
+        self.print_results(selected_lane_candidates)
 
         if len(selected_lane_candidates) < 2:
             return None, None, None, None
 
-        first_two_lists = selected_lane_candidates[:2]
-        [[lane1, mse1, cluster1, size1, score1], [lane2, mse2, cluster2, size2, score2]] = first_two_lists
-        info = [mse1, mse2, size1, size2, score1, score2]
+        [[lane1, mse1, cluster1, size1, score1], [lane2, mse2, cluster2, size2, score2]] = selected_lane_candidates[:2]
 
         road_center = self.calculate_road_center([lane1, lane2], image_height)
-        return lane1, lane2, road_center, info
+        return lane1, lane2, road_center, [mse1, mse2, size1, size2, score1, score2]
+
+    def overlay_visuals(self, img_color, img_edges, left_lines, right_lines, road_center):
+        img_color = self.visualize_curves(img_color, left_lines, right_lines, 66)
+        img_color = self.visualize_center(img_color, road_center, 66)
+        img_canny_color = cv2.cvtColor(img_edges, cv2.COLOR_GRAY2BGR)
+        return cv2.addWeighted(img_canny_color, 1, img_color, 1, 0)
 
     def visualize_curves(self, frame, left_curve, right_curve, image_height):
         average_curve = None
         if left_curve is not None and right_curve is not None:
-            average_curve = (left_curve+right_curve)/2
+            average_curve = (left_curve + right_curve) / 2
         plot_y = np.linspace(0, image_height - 1, image_height)
         colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]  # Red for left, Green for right
 
-        curves = [left_curve, right_curve] #average_curve
+        curves = [left_curve, right_curve]
         for idx, curve in enumerate(curves):
             if curve is not None:
                 plot_x = np.polyval(curve, plot_y)
                 points = np.int32(np.vstack([plot_x, plot_y]).T)
                 cv2.polylines(frame, [points], isClosed=False, color=colors[idx], thickness=5)
 
-
         return frame
-
 
     def visualize_center(self, frame, road_center, height):
         if road_center is not None:
             road_center = int(road_center)
-            return cv2.circle(frame, (road_center, 66), radius=5, color=(0, 0, 255), thickness=-1) #TODO 200 magic number
+            return cv2.circle(frame, (road_center, 66), radius=5, color=(0, 0, 255), thickness=-1)
         else:
             return frame
+
+    def print_results(self, selected_lane_candidates):
+        # Header for the output
+        self.log("{:<10} {:<10} {:<10}".format("MSE", "Size", "Score"), logging.DEBUG)
+        self.log("-" * 30, logging.DEBUG)  # Print a simple line of dashes for separation
+
+        # Loop through each candidate and print relevant details
+        for candidate in selected_lane_candidates:
+            mse = candidate[1]  # Assuming MSE is the second element in each sublist
+            size = candidate[3]  # Assuming Size is the fourth element in each sublist
+            score = candidate[4]  # Assuming Score is the fifth element in each sublist
+            self.log(f"{mse:.3f}      {size:.0f}      {score:.3f}", logging.DEBUG)
+        self.log("-" * 30, logging.DEBUG)  # Print a simple line of dashes for separation
 
 
 class PIDController:
@@ -225,13 +251,14 @@ class PIDController:
         self.integral += error
         derivative = error - self.prev_error
         steering = (
-            self.kp * error
-            + self.ki * self.integral
-            + self.kd * derivative
+                self.kp * error
+                + self.ki * self.integral
+                + self.kd * derivative
         )
         steering = max(min(steering, 1), -1)
         self.prev_error = error
         return steering
+
 
 if __name__ == "__main__":
     lane_detection = LaneDetectionNode()
