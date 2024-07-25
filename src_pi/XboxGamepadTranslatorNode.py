@@ -11,6 +11,7 @@ class XboxGamepadTranslatorNode(Node):
         self.zmq_subscriber = self.zmq_context.socket(zmq.SUB)
         self.zmq_subscriber.connect(zmq_sub_url)
         self.zmq_subscriber.setsockopt_string(zmq.SUBSCRIBE, zmq_sub_topic)
+        self.zmq_subscriber.setsockopt_string(zmq.SUBSCRIBE, zmq_sub_topic+"_disconnected")
 
         self.zmq_publisher = self.zmq_context.socket(zmq.PUB)
         self.zmq_publisher.bind(zmq_pub_url)
@@ -36,6 +37,16 @@ class XboxGamepadTranslatorNode(Node):
                         self.zmq_publisher.send(create_json_message(steering_commands, "gamepad_steering_commands", timestamp))
                     if function_commands:
                         self.zmq_publisher.send(create_json_message(function_commands, "gamepad_function_commands", timestamp))
+                elif topic == "gamepad_disconnected":
+                    steering_commands = {
+                        "steer": 0.0,
+                        "throttle": 0.0,
+                        "emergency_stop": 1,
+                        "reset_emergency_stop": 0,
+                        "sensors_enable": 0,
+                        "sensors_disable": 0
+                    }
+                    self.zmq_publisher.send(create_json_message(steering_commands, "gamepad_steering_commands", timestamp))
             except zmq.ZMQError as e:
                 self.log(f"ZMQ error: {e}", logging.ERROR)
             except Exception as e:

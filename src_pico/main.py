@@ -195,7 +195,7 @@ class Car:
         self.watchdog_timer.deinit()
 
     def flash_onboard_led(self, freq):
-        period = int(1000 / freq)
+        period = int(1000 / freq / 2) # devide by 2 because the timer toggles the LED
 
         def toggle_led(timer):
             self.led.value(not self.led.value())

@@ -9,6 +9,9 @@ from XboxGamepadTranslatorNode import XboxGamepadTranslatorNode
 from ControlFusionNode import ControlFusionNode
 from PilotNetCNode import PilotNetCNode
 from LaneDetectionNode import LaneDetectionNode
+import time
+import signal
+import os
 
 # Function to map string log level to logging level
 def get_log_level(log_level_str):
@@ -61,5 +64,32 @@ if __name__ == "__main__":
         p.start()
         print(f"Started {config['node_class'].__name__} with PID {p.pid}")
 
-    for p in processes:
-        p.join()
+
+    def terminate_all_processes(process_list):
+        for proc in process_list:
+            if proc.is_alive():
+                print(f"Terminating process {proc.pid}")
+                proc.terminate()
+                proc.join(timeout=0.3)
+                if proc.is_alive():
+                    print(f"Force killing process {proc.pid}")
+                    os.kill(proc.pid, signal.SIGKILL)
+
+
+    try:
+        while True:
+            crashed = False
+            for p in processes:
+                if not p.is_alive():
+                    print(f"Process {p.pid} crashed. Terminating all processes...")
+                    crashed = True
+                    break
+            if crashed:
+                terminate_all_processes(processes)
+                break
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        print("KeyboardInterrupt detected. Terminating all processes...")
+        terminate_all_processes(processes)
+
+    print("All processes terminated.")

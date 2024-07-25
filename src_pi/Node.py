@@ -1,5 +1,5 @@
 import logging
-
+import traceback
 
 class Node:
     def __init__(self, log_level=logging.INFO):
@@ -38,6 +38,7 @@ class Node:
             node_instance.log(f"Node started.", logging.INFO)
         except Exception as e:
             node_instance.log(f"{e}.", logging.ERROR)
+            traceback.print_exc()
         finally:
             node_instance.release()  # Ensure resources are released when done or if an error occurs
             node_instance.log(f"Node released.", logging.INFO)

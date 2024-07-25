@@ -45,12 +45,18 @@ class LaneDetectionNode(Node):
         self.zmq_subscriber.setsockopt(zmq.RCVHWM, 1)
         self.zmq_subscriber.setsockopt_string(zmq.SUBSCRIBE, self.camera_sub_topic)
 
+        self.image_width = 200
+        self.alpha = 0.1
+        self.beta = 2
+        self.size_threshold = 150
+        self.gamma = 2
+        self.pair_threshold = 10  # Adjust this threshold based on your needs
+
     def start(self):
         while True:
             message = self.zmq_subscriber.recv_multipart()
             topic, image, timestamp = parse_image_message(message)
             self.process_frame(image, timestamp)
-
 
     def release(self):
         self.zmq_publisher.close()
@@ -143,21 +149,53 @@ class LaneDetectionNode(Node):
         curves, mses, clusters = zip(*sorted_curve_mse_pairs)
         return curves, mses, clusters
 
+    def separate_edges(self, clusters):
+        left_edges = []
+        right_edges = []
+        for cluster in clusters:
+            x_coords = cluster[:, 0, 0]
+            if np.median(x_coords) < self.image_width / 2:
+                left_edges.append(cluster)
+            else:
+                right_edges.append(cluster)
+        return left_edges, right_edges
+
     def select_lane_candidates(self, curves, mses, clusters, sizes):
         if curves is None or len(curves) == 0:
             return []
-        epsilon = 1e-6
-        alpha = 0.1
-        beta = 2
-        size_threshold = 150
-        gamma = 2
-        scored_candidates = [
-            (curve, mse, cluster, size, alpha * -mse + beta * (
-                (size / size_threshold) ** gamma if size > size_threshold else (size / size_threshold)))
-            for curve, mse, cluster, size in zip(curves, mses, clusters, sizes)
-        ]
-        scored_candidates.sort(key=lambda x: x[4], reverse=True)
-        return [[curve, mse, cluster, size, score] for curve, mse, cluster, size, score in scored_candidates]
+
+        paired_edges = []
+        unpaired_edges = []
+
+        for i, curve1 in enumerate(curves):
+            for j, curve2 in enumerate(curves):
+                if i != j and self.is_paired(curve1, curve2):
+                    paired_edges.append(
+                        (curve1, curve2, mses[i], mses[j], clusters[i], clusters[j], sizes[i], sizes[j]))
+
+        for i, curve in enumerate(curves):
+            if all(not self.is_paired(curve, paired_curve) for paired_curve, _, _, _, _, _, _, _ in paired_edges):
+                unpaired_edges.append((curve, mses[i], clusters[i], sizes[i]))
+
+        paired_edges.sort(key=lambda x: self.score_pair(x), reverse=True)
+        unpaired_edges.sort(key=lambda x: self.score_unpaired(x), reverse=True)
+
+        return paired_edges[:2] + unpaired_edges[:2]
+
+    def is_paired(self, curve1, curve2):
+        if curve1 is None or curve2 is None:
+            return False
+        return abs(np.mean(curve1) - np.mean(curve2)) < self.pair_threshold
+
+    def score_pair(self, pair):
+        curve1, curve2, mse1, mse2, cluster1, cluster2, size1, size2 = pair
+        score = self.alpha * -(mse1 + mse2) + self.beta * ((size1 + size2) / self.size_threshold)
+        return score
+
+    def score_unpaired(self, edge):
+        curve, mse, cluster, size = edge
+        score = self.alpha * -mse + self.beta * (size / self.size_threshold)
+        return score
 
     def calculate_road_center(self, curves, image_height):
         if curves[0] is not None and curves[1] is not None:
@@ -168,16 +206,29 @@ class LaneDetectionNode(Node):
         return None
 
     def detect_curves_dbscan(self, img, image_height, image_width):
+        self.image_width = image_width
         clusters, labels = self.cluster_points(img)
         if clusters is not None:
             clusters.sort(key=len, reverse=True)
-        curves, mses, clusters = self.fit_polynomials(clusters)
-        cluster_sizes = [len(x) for x in clusters if x is not None]
-        selected_lane_candidates = self.select_lane_candidates(curves, mses, clusters, cluster_sizes)
+
+        left_edges, right_edges = self.separate_edges(clusters)
+
+        left_curves, left_mses, left_clusters = self.fit_polynomials(left_edges)
+        right_curves, right_mses, right_clusters = self.fit_polynomials(right_edges)
+
+        cluster_sizes = [len(x) for x in left_clusters + right_clusters if x is not None]
+        selected_lane_candidates = self.select_lane_candidates(
+            left_curves + right_curves, left_mses + right_mses, left_clusters + right_clusters, cluster_sizes
+        )
 
         self.print_results(selected_lane_candidates)
 
         if len(selected_lane_candidates) < 2:
+            return None, None, None, None
+
+        if len(selected_lane_candidates[0]) < 5 or len(selected_lane_candidates[1]) < 5:
+            self.log(f"Error: selected_lane_candidates have insufficient elements: {selected_lane_candidates}",
+                     logging.ERROR)
             return None, None, None, None
 
         [[lane1, mse1, cluster1, size1, score1], [lane2, mse2, cluster2, size2, score2]] = selected_lane_candidates[:2]
@@ -221,6 +272,9 @@ class LaneDetectionNode(Node):
 
         # Loop through each candidate and print relevant details
         for candidate in selected_lane_candidates:
+            if len(candidate) < 5:
+                self.log(f"Skipping candidate due to insufficient elements: {candidate}", logging.ERROR)
+                continue
             mse = candidate[1]  # Assuming MSE is the second element in each sublist
             size = candidate[3]  # Assuming Size is the fourth element in each sublist
             score = candidate[4]  # Assuming Score is the fifth element in each sublist

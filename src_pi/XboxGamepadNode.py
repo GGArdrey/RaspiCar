@@ -16,6 +16,7 @@ class XboxGamepadNode(Node):
         self.joystick_index = joystick_index
         self.zmq_pub_url = zmq_pub_url
         self.pub_topic = pub_topic
+        self.pub_topic_disconnected = pub_topic + "_disconnected"
         self.zmq_context = zmq.Context()
         self.zmq_publisher = self.zmq_context.socket(zmq.PUB)
         self.zmq_publisher.bind(self.zmq_pub_url)
@@ -32,6 +33,7 @@ class XboxGamepadNode(Node):
                     continue  # Skip further processing after disconnection
 
             if not self.connected:
+                self._publish_gamepad_disconnect()
                 time.sleep(1)  # Wait a bit before trying to reconnect
                 self.connected = self._connect_gamepad(self.joystick_index)
                 if not self.connected:
@@ -101,6 +103,12 @@ class XboxGamepadNode(Node):
             "dpad_left": 0,
             "dpad_right": 0
         }
+
+    def _publish_gamepad_disconnect(self):
+        """just publish the default message on discoonnect topic"""
+        default_state = self._get_initial_state()
+        message = create_json_message(default_state, self.pub_topic_disconnected)
+        self.zmq_publisher.send(message)
 
     def _publish_gamepad_input(self):
         """Handle the input from the controller."""
