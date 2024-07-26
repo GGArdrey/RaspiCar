@@ -3,7 +3,7 @@ import logging
 import cv2
 import zmq
 import time
-from utils.message_utils import parse_image_message, parse_compressed_image_message
+from utils.message_utils import parse_image_message, parse_jpg_image_message
 from Node import Node
 
 
@@ -15,6 +15,7 @@ class CameraSubscriberNode(Node):
         self.zmq_subscriber = self.zmq_context.socket(zmq.SUB)
         self.zmq_subscriber.connect(self.zmq_sub_url)
         self.zmq_subscriber.setsockopt(zmq.RCVHWM, 1)  # Set high water mark to 1 to drop old frames
+        self.zmq_subscriber.setsockopt(zmq.CONFLATE, 1)  # Keep only the latest message
         self.zmq_subscriber.setsockopt_string(zmq.SUBSCRIBE, zmq_sub_topic)
 
 
@@ -22,9 +23,9 @@ class CameraSubscriberNode(Node):
         while True:
             try:
                 message = self.zmq_subscriber.recv_multipart()
-                topic, image, timestamp = parse_compressed_image_message(message)
-                dt = time.time() - timestamp
-                self.log(f"Total time to receive image: {dt}", logging.DEBUG)
+                topic, image, timestamp = parse_jpg_image_message(message)
+                #dt = time.time() - timestamp
+                #self.log(f"Total time to receive image: {dt}", logging.DEBUG)
                 if image is not None:
                     cv2.imshow('Received Camera Feed', image)
                     if cv2.waitKey(1) & 0xFF == ord('q'):  # Press 'q' to exit
@@ -42,7 +43,7 @@ class CameraSubscriberNode(Node):
 
 
 if __name__ == "__main__":
-    subscriber_node = CameraSubscriberNode(zmq_sub_url="tcp://raspberrypi.local:5550", zmq_sub_topic="camera_lane_detection_compressed", log_level=logging.DEBUG)
+    subscriber_node = CameraSubscriberNode(zmq_sub_url="tcp://raspberrypi.local:5555", zmq_sub_topic="camera", log_level=logging.DEBUG)
     try:
         subscriber_node.start()
     except KeyboardInterrupt:

@@ -5,8 +5,8 @@ import logging
 from utils.timer_utils import timer
 from utils.message_utils import (
     create_json_message,
-    parse_image_message,
-    create_compressed_image_message
+    parse_jpg_image_message,
+    create_jpg_image_message
 )
 from Node import Node
 from sklearn.cluster import DBSCAN
@@ -42,13 +42,14 @@ class LaneDetectionNode(Node):
 
         self.zmq_subscriber = self.zmq_context.socket(zmq.SUB)
         self.zmq_subscriber.connect(self.camera_sub_url)
-        self.zmq_subscriber.setsockopt(zmq.RCVHWM, 1)
+        self.zmq_subscriber.setsockopt(zmq.CONFLATE, 1)  # Keep only the latest message
+        self.zmq_subscriber.setsockopt(zmq.RCVHWM, 1)  # Set high water mark to 1 to drop old frames
         self.zmq_subscriber.setsockopt_string(zmq.SUBSCRIBE, self.camera_sub_topic)
 
     def start(self):
         while True:
             message = self.zmq_subscriber.recv_multipart()
-            topic, image, timestamp = parse_image_message(message)
+            topic, image, timestamp = parse_jpg_image_message(message)
             self.process_frame(image, timestamp)
 
 
@@ -95,7 +96,7 @@ class LaneDetectionNode(Node):
         self.zmq_publisher.send(message)
 
     def publish_camera_frame(self, frame, timestamp):
-        message = create_compressed_image_message(frame, self.pub_camera_topic, timestamp)
+        message = create_jpg_image_message(frame, self.pub_camera_topic, timestamp)
         self.zmq_camera_publisher.send_multipart(message, flags=zmq.NOBLOCK)
 
     def resize_and_crop_image(self, image, target_width=200, target_height=66):

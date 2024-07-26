@@ -20,11 +20,13 @@ class ControlFusionNode(Node):
         self.control_subscriber = self.zmq_context.socket(zmq.SUB)
         self.control_subscriber.connect(control_sub_url)
         self.control_subscriber.setsockopt_string(zmq.SUBSCRIBE, control_sub_topic)
+        self.control_subscriber.setsockopt(zmq.RCVHWM, 1)  # Set high water mark to 1 to drop old frames
 
         # Gamepad subscriber
         self.gamepad_subscriber = self.zmq_context.socket(zmq.SUB)
         self.gamepad_subscriber.connect(gamepad_sub_url)
         self.gamepad_subscriber.setsockopt_string(zmq.SUBSCRIBE, gamepad_sub_topic)
+        self.gamepad_subscriber.setsockopt(zmq.RCVHWM, 1)  # Set high water mark to 1 to drop old frames
 
         # Publisher
         self.zmq_pub_topic = zmq_pub_topic
@@ -81,7 +83,6 @@ class ControlFusionNode(Node):
         self.current_gamepad_msg = payload
         self.update_override_end_times(current_time)
         latency = time.time() - timestamp
-        self.log(f"Total time to process gamepad: {latency}", logging.DEBUG)
         if latency > 0.2:
             self.log(f"High latency detected from processing gamepad: {latency}", logging.WARNING)
 

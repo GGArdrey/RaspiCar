@@ -4,7 +4,7 @@ import numpy as np
 import time
 from tflite_runtime.interpreter import Interpreter, load_delegate
 import zmq
-from utils.message_utils import create_json_message, parse_image_message
+from utils.message_utils import create_json_message, parse_image_message, parse_jpg_image_message
 import json
 import logging
 from Node import Node
@@ -39,9 +39,10 @@ class PilotNetCNode(Node):
 
         self.zmq_subscriber = self.zmq_context.socket(zmq.SUB)
         self.zmq_subscriber.connect(self.camera_sub_url)
+        self.zmq_subscriber.setsockopt(zmq.CONFLATE, 1)  # Keep only the latest message
         self.zmq_subscriber.setsockopt(zmq.RCVHWM, 1)  # Set high water mark to 1 to drop old frames
-        self.zmq_subscriber.setsockopt_string(zmq.SUBSCRIBE, self.camera_sub_topic)
 
+        self.zmq_subscriber.setsockopt_string(zmq.SUBSCRIBE, self.camera_sub_topic)
 
 
 
@@ -49,7 +50,7 @@ class PilotNetCNode(Node):
         while True:
             try:
                 message = self.zmq_subscriber.recv_multipart()
-                topic, image, timestamp = parse_image_message(message)
+                topic, image, timestamp = parse_jpg_image_message(message)
                 self.predict(image,timestamp)
             except zmq.ZMQError as e:
                 print(f"ZMQ error: {e}")
@@ -103,7 +104,7 @@ class PilotNetCNode(Node):
 
         self.log(f"Steering Prediction: {weighted_steering_value}", logging.DEBUG)
 
-        message = create_json_message(payload, self.zmq_pub_topic, timestamp=timestamp) #TODO change timestamp
+        message = create_json_message(payload, self.zmq_pub_topic, timestamp=timestamp)
         self.zmq_publisher.send(message)
 
 if __name__ == "__main__":

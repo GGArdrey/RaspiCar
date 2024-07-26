@@ -1,7 +1,7 @@
 import cv2
 import os
 import zmq
-from utils.message_utils import parse_image_message, parse_json_message
+from utils.message_utils import parse_jpg_image_message, parse_json_message
 import logging
 from datetime import datetime
 from Node import Node
@@ -71,7 +71,7 @@ class DataRecorderNode(Node):
 
     def _process_camera_frame(self):
         message = self.camera_subscriber.recv_multipart()
-        topic, frame, timestamp = parse_image_message(message)
+        topic, frame, timestamp = parse_jpg_image_message(message)
         self.latest_frame = frame
         self.latest_frame_timestamp = timestamp
 
@@ -97,6 +97,7 @@ class DataRecorderNode(Node):
         self.camera_subscriber = self.zmq_context.socket(zmq.SUB)
         self.camera_subscriber.connect(self.camera_sub_url)
         self.camera_subscriber.setsockopt(zmq.RCVHWM, 1)  # Set high water mark to 1 to drop old frames
+        self.camera_subscriber.setsockopt(zmq.CONFLATE, 1)  # Keep only the latest message
         self.camera_subscriber.setsockopt_string(zmq.SUBSCRIBE, self.camera_sub_topic)
 
 
@@ -104,6 +105,7 @@ class DataRecorderNode(Node):
         self.steering_commands_subscriber = self.zmq_context.socket(zmq.SUB)
         self.steering_commands_subscriber.connect(self.gamepad_sub_url)
         self.steering_commands_subscriber.setsockopt(zmq.RCVHWM, 1)  # Set high water mark to 1 to drop old frames
+        self.camera_subscriber.setsockopt(zmq.CONFLATE, 1)  # Keep only the latest message
         self.steering_commands_subscriber.setsockopt_string(zmq.SUBSCRIBE, self.gamepad_steering_sub_topic)
 
         self.poller.register(self.camera_subscriber, zmq.POLLIN)

@@ -6,7 +6,7 @@ from utils.timer_utils import timer
 from utils.message_utils import (
     create_json_message,
     parse_image_message,
-    create_compressed_image_message
+    create_jpg_image_message
 )
 from Node import Node
 from sklearn.cluster import DBSCAN
@@ -101,7 +101,7 @@ class LaneDetectionNode(Node):
         self.zmq_publisher.send(message)
 
     def publish_camera_frame(self, frame, timestamp):
-        message = create_compressed_image_message(frame, self.pub_camera_topic, timestamp)
+        message = create_jpg_image_message(frame, self.pub_camera_topic, timestamp)
         self.zmq_camera_publisher.send_multipart(message, flags=zmq.NOBLOCK)
 
     def resize_and_crop_image(self, image, target_width=200, target_height=66):

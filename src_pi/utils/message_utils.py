@@ -71,13 +71,13 @@ def parse_image_message(message, frame_height=640, frame_width=360):
     return topic, image, timestamp
 
 
-def create_compressed_image_message(image, topic, timestamp=None):
+def create_jpg_image_message(image, topic, timestamp=None, quality=100):
     if timestamp is None:
         timestamp = time.time()
     timestamp = str(timestamp).encode('utf-8')
 
-    # Compress the image using JPEG compression with a quality factor of 90
-    success, compressed_image = cv2.imencode('.jpg', image, [cv2.IMWRITE_JPEG_QUALITY, 90])
+    # Compress the image using JPEG compression with a quality factor
+    success, compressed_image = cv2.imencode('.jpg', image, [cv2.IMWRITE_JPEG_QUALITY, quality])
     if not success:
         raise ValueError("Image compression failed")
 
@@ -85,7 +85,7 @@ def create_compressed_image_message(image, topic, timestamp=None):
     return marshalled_message
 
 
-def parse_compressed_image_message(message, frame_height=640, frame_width=360):
+def parse_jpg_image_message(message):
     topic, compressed_image_data, timestamp = message
 
     # Decompress the image
