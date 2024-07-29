@@ -171,19 +171,23 @@ class LaneDetectionNode(Node):
         clusters, labels = self.cluster_points(img)
         if clusters is not None:
             clusters.sort(key=len, reverse=True)
-        curves, mses, clusters = self.fit_polynomials(clusters)
-        cluster_sizes = [len(x) for x in clusters if x is not None]
-        selected_lane_candidates = self.select_lane_candidates(curves, mses, clusters, cluster_sizes)
+            curves, mses, clusters = self.fit_polynomials(clusters)
+            if clusters is None:
+                return None, None, None, None
 
-        self.print_results(selected_lane_candidates)
+            cluster_sizes = [len(x) for x in clusters if x is not None]
+            selected_lane_candidates = self.select_lane_candidates(curves, mses, clusters, cluster_sizes)
 
-        if len(selected_lane_candidates) < 2:
-            return None, None, None, None
+            self.print_results(selected_lane_candidates)
 
-        [[lane1, mse1, cluster1, size1, score1], [lane2, mse2, cluster2, size2, score2]] = selected_lane_candidates[:2]
+            if len(selected_lane_candidates) < 2:
+                return None, None, None, None
 
-        road_center = self.calculate_road_center([lane1, lane2], image_height)
-        return lane1, lane2, road_center, [mse1, mse2, size1, size2, score1, score2]
+            [[lane1, mse1, cluster1, size1, score1], [lane2, mse2, cluster2, size2, score2]] = selected_lane_candidates[:2]
+
+            road_center = self.calculate_road_center([lane1, lane2], image_height)
+            return lane1, lane2, road_center, [mse1, mse2, size1, size2, score1, score2]
+        return None, None, None, None
 
     def overlay_visuals(self, img_color, img_edges, left_lines, right_lines, road_center):
         img_color = self.visualize_curves(img_color, left_lines, right_lines, 66)

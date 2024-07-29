@@ -10,7 +10,7 @@ from CommandInterface import CommandInterface  # Import the CommandInterface
 
 class ControlFusionNode(Node):
     def __init__(self, log_level=logging.INFO,
-                 override_duration=0.1,
+                 override_duration=0.0,
                  control_sub_url="tcp://localhost:5560",
                  control_sub_topic="steering_commands",
                  gamepad_sub_url="tcp://localhost:5541",
