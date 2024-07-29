@@ -6,7 +6,7 @@ logger = logging.getLogger("Stopwatch")
 logger.setLevel(logging.DEBUG)
 
 @contextmanager
-def timer(label):
+def timer(label=""):
     start = time.perf_counter()
     elapsed_time = None
     try:

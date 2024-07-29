@@ -4,17 +4,28 @@ from utils.message_utils import create_json_message, parse_json_message
 from Node import Node
 import logging
 
-class XboxGamepadTranslatorNode(Node):
-    def __init__(self, zmq_sub_url="tcp://*:5556", zmq_sub_topic="gamepad", zmq_pub_url="tcp://*:5557", log_level=logging.INFO):
+class GamepadCommandNode(Node):
+    def __init__(self, log_level=logging.INFO,
+                 joystick_deadzone = 0.15,
+                 gamepad_sub_url="tcp://localhost:5540",
+                 gamepad_sub_topic="gamepad",
+                 gamepad_command_pub_url="tcp://localhost:5541",
+                 gamepad_function_commands_pub_topic = "gamepad_function_commands",
+                 gamepad_steering_commands_pub_topic = "gamepad_steering_commands"):
         super().__init__(log_level=log_level)
+        self.joystick_deadzone = joystick_deadzone
+        self.gamepad_function_commands_pub_topic = gamepad_function_commands_pub_topic
+        self.gamepad_steering_commands_pub_topic = gamepad_steering_commands_pub_topic
         self.zmq_context = zmq.Context()
-        self.zmq_subscriber = self.zmq_context.socket(zmq.SUB)
-        self.zmq_subscriber.connect(zmq_sub_url)
-        self.zmq_subscriber.setsockopt_string(zmq.SUBSCRIBE, zmq_sub_topic)
-        self.zmq_subscriber.setsockopt_string(zmq.SUBSCRIBE, zmq_sub_topic+"_disconnected")
+        self.gamepad_subscriber = self.zmq_context.socket(zmq.SUB)
+        self.gamepad_subscriber.connect(gamepad_sub_url)
+        self.gamepad_sub_topic = gamepad_sub_topic
+        self.gamepad_sub_topic_disconnected = gamepad_sub_topic + "_disconnected"
+        self.gamepad_subscriber.setsockopt_string(zmq.SUBSCRIBE, self.gamepad_sub_topic)
+        self.gamepad_subscriber.setsockopt_string(zmq.SUBSCRIBE, self.gamepad_sub_topic_disconnected)
 
         self.zmq_publisher = self.zmq_context.socket(zmq.PUB)
-        self.zmq_publisher.bind(zmq_pub_url)
+        self.zmq_publisher.bind(gamepad_command_pub_url)
 
         # Define key mappings
         self.key_mappings = {
@@ -29,15 +40,15 @@ class XboxGamepadTranslatorNode(Node):
     def start(self):
         while True:
             try:
-                message = self.zmq_subscriber.recv_string()
+                message = self.gamepad_subscriber.recv_string()
                 topic, timestamp, payload = parse_json_message(message)
-                if topic == "gamepad":
+                if topic == self.gamepad_sub_topic:
                     steering_commands, function_commands = self.translate_gamepad_input(payload)
                     if steering_commands:
-                        self.zmq_publisher.send(create_json_message(steering_commands, "gamepad_steering_commands", timestamp))
+                        self.zmq_publisher.send(create_json_message(steering_commands, self.gamepad_steering_commands_pub_topic, timestamp))
                     if function_commands:
-                        self.zmq_publisher.send(create_json_message(function_commands, "gamepad_function_commands", timestamp))
-                elif topic == "gamepad_disconnected":
+                        self.zmq_publisher.send(create_json_message(function_commands, self.gamepad_function_commands_pub_topic, timestamp))
+                elif topic == self.gamepad_sub_topic_disconnected:
                     steering_commands = {
                         "steer": 0.0,
                         "throttle": 0.0,
@@ -54,7 +65,7 @@ class XboxGamepadTranslatorNode(Node):
 
     def release(self):
         self.zmq_publisher.close()
-        self.zmq_subscriber.close()
+        self.gamepad_subscriber.close()
         self.zmq_context.term()
 
     def translate_gamepad_input(self, payload):
@@ -76,7 +87,7 @@ class XboxGamepadTranslatorNode(Node):
         # Handle joystick and trigger inputs
         if "left_stick_x" in payload:
             steer_value = payload["left_stick_x"]
-            steering_commands["steer"] = 0 if abs(steer_value) <= 0.15 else steer_value #TODO param magic number
+            steering_commands["steer"] = 0 if abs(steer_value) <= self.joystick_deadzone else steer_value
         if "right_trigger" in payload:
             steering_commands["throttle"] += payload["right_trigger"]
         if "left_trigger" in payload:
@@ -93,7 +104,7 @@ class XboxGamepadTranslatorNode(Node):
         return steering_commands, function_commands
 
 if __name__ == "__main__":
-    translator = XboxGamepadTranslatorNode()
+    translator = GamepadCommandNode()
     try:
         translator.start()
     finally:

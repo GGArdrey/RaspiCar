@@ -8,8 +8,13 @@ from threading import Thread, Lock
 
 
 class CameraNode(Node):
-    def __init__(self, frame_rate=10, camera_source=0, frame_width=None, frame_height=None, zmq_pub_url="tcp://*:5555",
-                 pub_topic='camera', log_level=logging.INFO):
+    def __init__(self, log_level=logging.INFO,
+                 frame_rate=10,
+                 camera_source=0,
+                 frame_width=640,
+                 frame_height=360,
+                 zmq_pub_url="tcp://*:5550",
+                 pub_topic='camera'):
         super().__init__(log_level=log_level)
         self.camera_source = camera_source
         self.frame_duration = 1 / frame_rate
@@ -44,7 +49,7 @@ class CameraNode(Node):
                     frame = self.latest_frame.copy()
                     message = create_jpg_image_message(frame, self.pub_topic, quality=95)
                     try:
-                        self.zmq_publisher.send_multipart(message, flags=zmq.NOBLOCK)
+                        self.zmq_publisher.send_multipart(message)
                     except zmq.Again:
                         self.log("Publisher queue is full, dropping frame.", logging.WARNING)
 

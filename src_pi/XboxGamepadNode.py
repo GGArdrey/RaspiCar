@@ -8,7 +8,11 @@ pygame.mixer.pre_init(frequency=48000, buffer=2048)
 
 
 class XboxGamepadNode(Node):
-    def __init__(self, joystick_index=0, input_freq=20, zmq_pub_url="tcp://*:5556", pub_topic="gamepad", log_level=logging.INFO):
+    def __init__(self,log_level=logging.INFO,
+                 joystick_index=0,
+                 input_freq=20,
+                 zmq_pub_url="tcp://localhost:5540",
+                 pub_topic="gamepad"):
         super().__init__(log_level=log_level)
         pygame.init()
         pygame.joystick.init()

@@ -5,10 +5,11 @@ from CameraNode import CameraNode
 from XboxGamepadNode import XboxGamepadNode
 from Node import Node
 from DataRecorderNode import DataRecorderNode
-from XboxGamepadTranslatorNode import XboxGamepadTranslatorNode
+from GamepadCommandNode import GamepadCommandNode
 from ControlFusionNode import ControlFusionNode
 from PilotNetCNode import PilotNetCNode
 from LaneDetectionNode import LaneDetectionNode
+from YourAlgorithmTemplateNode import YourAlgorithmTemplateNode
 import time
 import signal
 import os
@@ -38,22 +39,13 @@ if __name__ == "__main__":
     # Get the logging level
     log_level = get_log_level(args.log)
 
-    # Example configuration for multiple nodes
     node_configs = [
-        {"node_class": ControlFusionNode, "args": ("tcp://localhost:5560", "pilotnetc_steering_commands",
-                                                  "tcp://localhost:5557", "gamepad_steering_commands",
-                                                  "tcp://localhost:5570", "fused_steering_commands", 0.0, "DEBUG")},
-        {"node_class": CameraNode, "args": (10, 0, 640, 360, "tcp://*:5555", 'camera', "INFO")},
-        {"node_class": XboxGamepadNode, "args": (0, 10, "tcp://localhost:5556", "gamepad", "INFO")},
-        {"node_class": XboxGamepadTranslatorNode, "args": ("tcp://localhost:5556", "gamepad", "tcp://localhost:5557", "INFO")},
-        {"node_class": DataRecorderNode, "args": ("tcp://localhost:5555", "camera",
-                                                  "tcp://localhost:5557", "gamepad_function_commands", "gamepad_steering_commands",
-                                                  "./data/", log_level)},
-        {"node_class": PilotNetCNode, "args": ("tcp://localhost:5560", "pilotnetc_steering_commands", "tcp://localhost:5555", "camera", log_level)}
-        # {"node_class": LaneDetectionNode,
-        #  "args": ("tcp://localhost:5560", "lane_detection_steering_commands",
-        #           "tcp://*:5550", "camera_lane_detection_compressed",
-        #           "tcp://localhost:5555", "camera", log_level)}
+        {"node_class": ControlFusionNode, "args": (log_level,)},
+        {"node_class": CameraNode, "args": (log_level,)},
+        {"node_class": XboxGamepadNode, "args": (log_level,)},
+        {"node_class": GamepadCommandNode, "args": (log_level,)},
+        {"node_class": DataRecorderNode, "args": (log_level,)},
+        {"node_class": PilotNetCNode, "args": (log_level,)}
     ]
 
     processes = []

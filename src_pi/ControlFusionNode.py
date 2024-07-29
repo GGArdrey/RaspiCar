@@ -9,10 +9,14 @@ from CommandInterface import CommandInterface  # Import the CommandInterface
 # TODO should this node start even when no controller command is received?
 
 class ControlFusionNode(Node):
-    def __init__(self, control_sub_url="tcp://*:5560", control_sub_topic="pilotnetc_steering_commands",
-                 gamepad_sub_url="tcp://*:5557", gamepad_sub_topic="gamepad_steering_commands",
-                 zmq_pub_url="tcp://*:5570", zmq_pub_topic="fused_steering_commands", override_duration=3,
-                 log_level=logging.INFO):
+    def __init__(self, log_level=logging.INFO,
+                 override_duration=3,
+                 control_sub_url="tcp://localhost:5560",
+                 control_sub_topic="steering_commands",
+                 gamepad_sub_url="tcp://localhost:5541",
+                 gamepad_sub_topic="gamepad_steering_commands",
+                 zmq_pub_url="tcp://localhost:5570",
+                 zmq_pub_topic="fused_steering_commands"):
         super().__init__(log_level=log_level)
         self.zmq_context = zmq.Context()
 
@@ -39,7 +43,7 @@ class ControlFusionNode(Node):
         self.poller.register(self.gamepad_subscriber, zmq.POLLIN)
 
         # Initialize last received messages and override tracking
-        self.override_end_times = {
+        self.override_end_times = { #TODO remove?
             "steer": 0,
             "throttle": 0,
             "emergency_stop": 0,
@@ -78,7 +82,7 @@ class ControlFusionNode(Node):
             self.publish_message(fused_msg)
 
     def _process_gamepad_message(self, current_time):
-        message = self.gamepad_subscriber.recv_string()
+        message = self.gamepad_subscriber.recv_string() #TOOD: check if normal receive is also possible
         _, timestamp, payload = parse_json_message(message)
         self.current_gamepad_msg = payload
         self.update_override_end_times(current_time)

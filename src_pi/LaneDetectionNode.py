@@ -13,13 +13,13 @@ from sklearn.cluster import DBSCAN
 
 
 class LaneDetectionNode(Node):
-    def __init__(self, zmq_pub_url="tcp://*:5561",
-                 zmq_pub_topic="lane_detection_steering_commands",
-                 zmq_camera_pub_url="tcp://*:5550",
+    def __init__(self, log_level=logging.INFO,
+                 zmq_pub_url="tcp://localhost:5560",
+                 zmq_pub_topic="steering_commands",
+                 zmq_camera_pub_url="tcp://*:5551",
                  zmq_camera_pub_topic="camera_lane_detection",
-                 camera_sub_url="tcp://*:5555",
-                 camera_sub_topic="camera",
-                 log_level=logging.INFO):
+                 camera_sub_url="tcp://localhost:5550",
+                 camera_sub_topic="camera"):
         super().__init__(log_level=log_level)
         self.latest_frame = None
         self.pid_controller = PIDController(0.02, 0.0, 0.05)

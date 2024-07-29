@@ -10,11 +10,11 @@ import logging
 from Node import Node
 class PilotNetCNode(Node):
 
-    def __init__(self, zmq_pub_url="tcp://*:5560",
-                 zmq_pub_topic = "pilotnetc_steering_commands",
-                 camera_sub_url="tcp://*:5555",
-                 camera_sub_topic="camera",
-                 log_level=logging.INFO):
+    def __init__(self, log_level=logging.INFO,
+                 zmq_pub_url="tcp://localhost:5560",
+                 zmq_pub_topic = "steering_commands",
+                 camera_sub_url="tcp://localhost:5550",
+                 camera_sub_topic="camera"):
         super().__init__(log_level=log_level)
         self.latest_frame = None
         # Load the Edge TPU delegate
@@ -106,7 +106,6 @@ class PilotNetCNode(Node):
 
         message = create_json_message(payload, self.zmq_pub_topic, timestamp=timestamp)
         self.zmq_publisher.send(message)
-
 if __name__ == "__main__":
     pilotnet = PilotNetCNode()
     pilotnet.start()

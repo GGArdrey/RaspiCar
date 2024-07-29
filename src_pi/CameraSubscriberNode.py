@@ -3,12 +3,14 @@ import logging
 import cv2
 import zmq
 import time
-from utils.message_utils import parse_image_message, parse_jpg_image_message
+from utils.message_utils import parse_jpg_image_message
 from Node import Node
 
 
 class CameraSubscriberNode(Node):
-    def __init__(self, zmq_sub_url="tcp://raspberrypi.local:5555", zmq_sub_topic="camera", log_level=logging.INFO):
+    def __init__(self, log_level=logging.INFO,
+                 zmq_sub_url="tcp://raspberrypi.local:5550",
+                 zmq_sub_topic="camera"):
         super().__init__(log_level=log_level)
         self.zmq_sub_url = zmq_sub_url
         self.zmq_context = zmq.Context()
@@ -43,7 +45,7 @@ class CameraSubscriberNode(Node):
 
 
 if __name__ == "__main__":
-    subscriber_node = CameraSubscriberNode(zmq_sub_url="tcp://raspberrypi.local:5555", zmq_sub_topic="camera", log_level=logging.DEBUG)
+    subscriber_node = CameraSubscriberNode(log_level=logging.DEBUG, zmq_sub_url="tcp://raspberrypi.local:5550", zmq_sub_topic="camera")
     try:
         subscriber_node.start()
     except KeyboardInterrupt:

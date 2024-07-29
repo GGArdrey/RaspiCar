@@ -7,21 +7,25 @@ from datetime import datetime
 from Node import Node
 
 class DataRecorderNode(Node):
-    def __init__(self, camera_sub_url="tcp://localhost:5555",
-                 camera_sub_topic="camera",
-                 gamepad_sub_url="tcp://localhost:5557",
-                 gamepad_function_sub_topic="function_commands",
-                 gamepad_steering_sub_topic="steering_commands",
+    def __init__(self, log_level=logging.INFO,
+                 max_time_diff=0.1,
                  save_dir='/home/pi/data/',
-                 log_level=logging.INFO):
+                 image_sub_url="tcp://localhost:5550",
+                 image_sub_topic="camera",
+                 gamepad_sub_url="tcp://localhost:5541",
+                 gamepad_function_sub_topic="function_commands",
+                 steering_commands_url="tcp://localhost:5557",
+                 steering_commands_topic="steering_commands"):
+
         super().__init__(log_level=log_level)
-        self.camera_sub_url = camera_sub_url
-        self.camera_sub_topic = camera_sub_topic
+        self.image_sub_url = image_sub_url
+        self.image_sub_topic = image_sub_topic
         self.gamepad_sub_url = gamepad_sub_url
         self.gamepad_function_sub_topic = gamepad_function_sub_topic
-        self.gamepad_steering_sub_topic = gamepad_steering_sub_topic
+        self.steering_commands_sub_url = steering_commands_url
+        self.steering_commands_sub_topic = steering_commands_topic
         self.save_dir = save_dir
-        self.max_time_diff = 0.1  # Maximum allowable time difference between frame and gamepad data
+        self.max_time_diff = max_time_diff  # Maximum allowable time difference between frame and gamepad data
         self.running = False
         self.storage_dir = None
         self.image_count = 0
@@ -52,7 +56,7 @@ class DataRecorderNode(Node):
                 self._process_function_commands()
 
             if self.recording:
-                if self.camera_subscriber in events:
+                if self.image_subscriber in events:
                     self._process_camera_frame()
 
                 if self.steering_commands_subscriber in events:
@@ -63,14 +67,14 @@ class DataRecorderNode(Node):
 
     def release(self):
         self.function_commands_subscriber.close()
-        if hasattr(self, 'camera_subscriber') and self.camera_subscriber:
-            self.camera_subscriber.close()
+        if hasattr(self, 'image_subscriber') and self.image_subscriber:
+            self.image_subscriber.close()
         if hasattr(self, 'steering_commands_subscriber') and self.steering_commands_subscriber:
             self.steering_commands_subscriber.close()
         self.zmq_context.term()
 
     def _process_camera_frame(self):
-        message = self.camera_subscriber.recv_multipart()
+        message = self.image_subscriber.recv_multipart()
         topic, frame, timestamp = parse_jpg_image_message(message)
         self.latest_frame = frame
         self.latest_frame_timestamp = timestamp
@@ -94,28 +98,28 @@ class DataRecorderNode(Node):
 
     def _setup_subscribers(self):
         # Camera subscriber
-        self.camera_subscriber = self.zmq_context.socket(zmq.SUB)
-        self.camera_subscriber.connect(self.camera_sub_url)
-        self.camera_subscriber.setsockopt(zmq.RCVHWM, 1)  # Set high water mark to 1 to drop old frames
-        self.camera_subscriber.setsockopt(zmq.CONFLATE, 1)  # Keep only the latest message
-        self.camera_subscriber.setsockopt_string(zmq.SUBSCRIBE, self.camera_sub_topic)
+        self.image_subscriber = self.zmq_context.socket(zmq.SUB)
+        self.image_subscriber.connect(self.image_sub_url)
+        self.image_subscriber.setsockopt(zmq.RCVHWM, 1)  # Set high water mark to 1 to drop old frames
+        self.image_subscriber.setsockopt(zmq.CONFLATE, 1)  # Keep only the latest message
+        self.image_subscriber.setsockopt_string(zmq.SUBSCRIBE, self.image_sub_topic)
 
 
         # Steering commands subscriber
         self.steering_commands_subscriber = self.zmq_context.socket(zmq.SUB)
-        self.steering_commands_subscriber.connect(self.gamepad_sub_url)
+        self.steering_commands_subscriber.connect(self.steering_commands_sub_url)
         self.steering_commands_subscriber.setsockopt(zmq.RCVHWM, 1)  # Set high water mark to 1 to drop old frames
-        self.camera_subscriber.setsockopt(zmq.CONFLATE, 1)  # Keep only the latest message
-        self.steering_commands_subscriber.setsockopt_string(zmq.SUBSCRIBE, self.gamepad_steering_sub_topic)
+        self.image_subscriber.setsockopt(zmq.CONFLATE, 1)  # Keep only the latest message
+        self.steering_commands_subscriber.setsockopt_string(zmq.SUBSCRIBE, self.steering_commands_sub_topic)
 
-        self.poller.register(self.camera_subscriber, zmq.POLLIN)
+        self.poller.register(self.image_subscriber, zmq.POLLIN)
         self.poller.register(self.steering_commands_subscriber, zmq.POLLIN)
 
     def _close_subscribers(self):
-        if hasattr(self, 'camera_subscriber') and self.camera_subscriber:
-            self.poller.unregister(self.camera_subscriber)
-            self.camera_subscriber.close()
-            self.camera_subscriber = None
+        if hasattr(self, 'camera_subscriber') and self.image_subscriber:
+            self.poller.unregister(self.image_subscriber)
+            self.image_subscriber.close()
+            self.image_subscriber = None
 
         if hasattr(self, 'steering_commands_subscriber') and self.steering_commands_subscriber:
             self.poller.unregister(self.steering_commands_subscriber)
