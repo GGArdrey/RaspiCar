@@ -17,7 +17,7 @@ class LaneDetectionNode(Node):
                  zmq_pub_url="tcp://localhost:5560",
                  zmq_pub_topic="steering_commands",
                  zmq_camera_pub_url="tcp://*:5551",
-                 zmq_camera_pub_topic="camera_lane_detection",
+                 zmq_camera_pub_topic="image_lane_detection",
                  camera_sub_url="tcp://localhost:5550",
                  camera_sub_topic="camera"):
         super().__init__(log_level=log_level)
@@ -51,7 +51,6 @@ class LaneDetectionNode(Node):
             message = self.zmq_subscriber.recv_multipart()
             topic, image, timestamp = parse_jpg_image_message(message)
             self.process_frame(image, timestamp)
-
 
     def release(self):
         self.zmq_publisher.close()
@@ -257,5 +256,12 @@ class PIDController:
 
 
 if __name__ == "__main__":
-    lane_detection = LaneDetectionNode()
+    lane_detection = LaneDetectionNode(log_level=logging.DEBUG,
+                                       zmq_pub_url="tcp://*:5560",
+                                       zmq_pub_topic="steering_commands",
+                                       zmq_camera_pub_url="tcp://*:5551",
+                                       zmq_camera_pub_topic="image_lane_detection",
+                                       camera_sub_url="tcp://raspberrypi.local:5550",
+                                       camera_sub_topic="camera")
+
     lane_detection.start()

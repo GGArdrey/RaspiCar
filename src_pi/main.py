@@ -48,6 +48,14 @@ if __name__ == "__main__":
         {"node_class": PilotNetCNode, "args": (log_level,)}
     ]
 
+    # node_configs2 = [
+    #     {"node_class": ControlFusionNode, "args": (log_level,1,"tcp://192.168.0.80:5560",)},
+    #     {"node_class": CameraNode, "args": (log_level,)},
+    #     {"node_class": XboxGamepadNode, "args": (log_level,)},
+    #     {"node_class": GamepadCommandNode, "args": (log_level,)},
+    #     {"node_class": DataRecorderNode, "args": (log_level,)}
+    # ]
+
     processes = []
 
     for config in node_configs:

@@ -10,7 +10,7 @@ from CommandInterface import CommandInterface  # Import the CommandInterface
 
 class ControlFusionNode(Node):
     def __init__(self, log_level=logging.INFO,
-                 override_duration=3,
+                 override_duration=0.1,
                  control_sub_url="tcp://localhost:5560",
                  control_sub_topic="steering_commands",
                  gamepad_sub_url="tcp://localhost:5541",
@@ -43,7 +43,8 @@ class ControlFusionNode(Node):
         self.poller.register(self.gamepad_subscriber, zmq.POLLIN)
 
         # Initialize last received messages and override tracking
-        self.override_end_times = { #TODO remove?
+        # This stores the end time for each override command
+        self.override_end_times = {
             "steer": 0,
             "throttle": 0,
             "emergency_stop": 0,
@@ -51,6 +52,7 @@ class ControlFusionNode(Node):
             "sensors_enable": 0,
             "sensors_disable": 0
         }
+
         self.override_duration = override_duration
         self.default_values = {
             "steer": 0.0,
