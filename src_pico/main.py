@@ -64,11 +64,9 @@ class CommunicationManager:
         self.fsm.handle_event('steer', *args)
 
     def enable_sensors(self, args):
-        self.car.stop_sensors(self.read_sensors) #TODO this bypasses fsm
         self.fsm.handle_event('enable_sensors', *args)
 
     def disable_sensors(self, args):
-        self.car.stop_sensors() #TODO this bypasses fsm
         self.fsm.handle_event('disable_sensors', *args)
 
     def manual_emergency(self, args):
@@ -99,7 +97,7 @@ class CommunicationManager:
         self.ping_alive = False
 
 
-class Car:
+class CarAbstractionLayer:
     def __init__(self):
         self.servo_neutral = 4500
         self.servo_max_left = 2500
@@ -208,7 +206,7 @@ class Car:
         self.led.value(0)  # Turn off LED
 
 if __name__ == "__main__":
-    picar = Car()
+    picar = CarAbstractionLayer()
     comm_manager = CommunicationManager(picar)
 
     # Start watchdog timer with the callback to comm_manager

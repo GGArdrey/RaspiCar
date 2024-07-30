@@ -8,17 +8,23 @@ class State:
     def exit(self, *args):
         pass
 
-    def drive(self, *args):
+    def throttle(self, *args):
         pass
 
     def steer(self, *args):
         pass
 
     def sensors_enable(self, *args):
-        pass
+        # Note: This is a placeholder for the actual implementation
+        # As TOF sensors are not used in the current implementation
+        # Nevertheless, this is the default behavior that they can be enabled/disabled in every state
+        self.fsm.car.start_sensors()
 
     def sensors_disable(self, *args):
-        pass
+        # Note: This is a placeholder for the actual implementation
+        # As TOF sensors are not used in the current implementation
+        # Nevertheless, this is the default behavior that they can be enabled/disabled in every state
+        self.fsm.car.stop_sensors()
 
     def manual_emergency(self, *args):
         pass
@@ -47,7 +53,7 @@ class IdleState(State):
     def exit(self, *args):
         self.fsm.car.stop_onboard_led()
 
-    def drive(self, *args):
+    def throttle(self, *args):
         self.fsm.car.motor_drive(int(args[0]))
         self.fsm.transition_to('DRIVING')
 
@@ -70,7 +76,7 @@ class DrivingState(State):
     def exit(self, *args):
         self.fsm.car.stop_onboard_led()
 
-    def drive(self, *args):
+    def throttle(self, *args):
         self.fsm.car.motor_drive(int(args[0]))
 
     def steer(self, *args):
@@ -106,6 +112,9 @@ class AutomaticEmergencyStopState(State):
     def ping_success(self, *args):
         self.fsm.transition_to('IDLE')
 
+    def manual_emergency(self, *args):
+        self.fsm.transition_to('MANUAL_EMERGENCY_STOP')
+
 class DistanceEmergencyStopState(State):
     def enter(self, *args):
         self.fsm.car.motor_drive(0)
@@ -115,7 +124,7 @@ class DistanceEmergencyStopState(State):
     def exit(self, *args):
         self.fsm.car.stop_onboard_led()
 
-    def drive(self, *args):
+    def throttle(self, *args):
         if int(args[0]) < 0:
             self.fsm.car.motor_drive(int(args[0]))
 
@@ -140,6 +149,7 @@ class FiniteStateMachine:
             #'DISTANCE_EMERGENCY_STOP': DistanceEmergencyStopState(self)
         }
         self.state = self.states['IDLE']
+        self.state.enter()
 
     def transition_to(self, state_name):
         print(f"Transitioning to {state_name}")

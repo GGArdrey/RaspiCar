@@ -45,7 +45,7 @@ if __name__ == "__main__":
         {"node_class": XboxGamepadNode, "args": (log_level,)},
         {"node_class": GamepadCommandNode, "args": (log_level,)},
         {"node_class": DataRecorderNode, "args": (log_level,)},
-        {"node_class": PilotNetCNode, "args": (log_level,)}
+        {"node_class": LaneDetectionNode, "args": (log_level,)}
     ]
 
     # node_configs2 = [
