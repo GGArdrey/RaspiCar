@@ -89,9 +89,9 @@ class GamepadCommandNode(Node):
             steer_value = payload["left_stick_x"]
             steering_commands["steer"] = 0 if abs(steer_value) <= self.joystick_deadzone else steer_value
         if "right_trigger" in payload:
-            steering_commands["throttle"] += payload["right_trigger"]
+            steering_commands["throttle"] += (payload["right_trigger"] + 1) / 2 # mapping raw inputs
         if "left_trigger" in payload:
-            steering_commands["throttle"] -= payload["left_trigger"]
+            steering_commands["throttle"] -= (payload["left_trigger"] + 1) / 2 # mapping raw inputs
 
         # Handle button presses for other commands
         for button, command in self.key_mappings.items():

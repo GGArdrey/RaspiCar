@@ -1,5 +1,11 @@
 # Master Makefile to handle the entire deployment process
 
+
+
+# Upload for WINDOWS command HERE
+# to upload on windows copy&paste this into powershell:
+# ssh pi@raspberrypi.local 'mkdir -p /home/pi/raspicar/src_pi/ && mkdir -p /home/pi/raspicar/src_pico/' ; scp -r ./src_pi pi@raspberrypi.local:/home/pi/raspicar/ ; scp -r ./src_pico pi@raspberrypi.local:/home/pi/raspicar/ ; ssh pi@raspberrypi.local 'cd /home/pi/raspicar/src_pico/ && /home/pi/.local/bin/rshell cp * /pyboard/'
+
 # Define default target
 all: upload-code upload-to-pico
 

@@ -12,15 +12,15 @@ class DataRecorderNode(Node):
                  save_dir='/home/pi/data/',
                  image_sub_url="tcp://localhost:5550",
                  image_sub_topic="camera",
-                 gamepad_sub_url="tcp://localhost:5541",
-                 gamepad_function_sub_topic="function_commands",
-                 steering_commands_url="tcp://localhost:5557",
-                 steering_commands_topic="steering_commands"):
+                 gamepad_function_sub_url="tcp://localhost:5541",
+                 gamepad_function_sub_topic="gamepad_function_commands",
+                 steering_commands_url="tcp://localhost:5541",
+                 steering_commands_topic="gamepad_steering_commands"):
 
         super().__init__(log_level=log_level)
         self.image_sub_url = image_sub_url
         self.image_sub_topic = image_sub_topic
-        self.gamepad_sub_url = gamepad_sub_url
+        self.gamepad_function_sub_url = gamepad_function_sub_url
         self.gamepad_function_sub_topic = gamepad_function_sub_topic
         self.steering_commands_sub_url = steering_commands_url
         self.steering_commands_sub_topic = steering_commands_topic
@@ -35,7 +35,7 @@ class DataRecorderNode(Node):
 
         # Function commands subscriber
         self.function_commands_subscriber = self.zmq_context.socket(zmq.SUB)
-        self.function_commands_subscriber.connect(self.gamepad_sub_url)
+        self.function_commands_subscriber.connect(self.gamepad_function_sub_url)
         self.function_commands_subscriber.setsockopt_string(zmq.SUBSCRIBE, self.gamepad_function_sub_topic)
 
         # Poller to monitor function commands

@@ -20,7 +20,7 @@ class CommunicationManager:
         # This defines all commands that are received over UART
         self.command_map = {
             "ping": self.ping_success,
-            "drive": self.drive,
+            "throttle": self.throttle,
             "steer": self.steer,
             "sensors_enable": self.enable_sensors,
             "sensors_disable": self.disable_sensors,
@@ -57,8 +57,8 @@ class CommunicationManager:
             print(f"UART read error: {e}")
             return ''
 
-    def drive(self, args):
-        self.fsm.handle_event('drive', *args)
+    def throttle(self, args):
+        self.fsm.handle_event('throttle', *args)
 
     def steer(self, args):
         self.fsm.handle_event('steer', *args)

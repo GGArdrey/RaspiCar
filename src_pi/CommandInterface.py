@@ -49,7 +49,7 @@ class CommandInterface:
         value = value * 100
         if self.uart:
             with self.lock:
-                self.uart.write(('drive,' + str(int(value)) + '\n').encode('utf-8'))
+                self.uart.write(('throttle,' + str(int(value)) + '\n').encode('utf-8'))
 
     def steer(self, value):
         value = value * 100

@@ -26,8 +26,6 @@ class CameraSubscriberNode(Node):
             try:
                 message = self.zmq_subscriber.recv_multipart()
                 topic, image, timestamp = parse_jpg_image_message(message)
-                #dt = time.time() - timestamp
-                #self.log(f"Total time to receive image: {dt}", logging.DEBUG)
                 if image is not None:
                     cv2.imshow('Received Camera Feed', image)
                     if cv2.waitKey(1) & 0xFF == ord('q'):  # Press 'q' to exit
