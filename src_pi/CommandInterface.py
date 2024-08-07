@@ -1,9 +1,20 @@
+"""
+RaspiCar
+Copyright (c) 2024 Fynn Luca Maaß
+
+Licensed under the Custom License. See the LICENSE file in the project root for license terms.
+"""
+
 import serial
 import time
 import threading
 from threading import Lock
 
 class CommandInterface:
+    '''
+    This class sends all UART commands to the Pico.
+    '''
+
     def __init__(self):
         port = "/dev/ttyS0"
         baudrate = 115200
@@ -19,10 +30,13 @@ class CommandInterface:
             self.uart = None
 
     def send_ping(self):
+        '''
+        This method is ran in a dedicated thread to send a heartbeat message every ~100ms
+        '''
         while True:
             if self.uart:
                 with self.lock:
-                    self.uart.write(('ping,1\n').encode('utf8'))  # Send the "ping" command
+                    self.uart.write(('ping,1\n').encode('utf8'))
             time.sleep(0.1)  # Wait for 100ms
 
     def sensors_enable(self):

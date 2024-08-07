@@ -1,5 +1,11 @@
-import logging
+"""
+RaspiCar
+Copyright (c) 2024 Fynn Luca Maaß
 
+Licensed under the Custom License. See the LICENSE file in the project root for license terms.
+"""
+
+import logging
 import cv2
 import zmq
 import time
@@ -8,6 +14,11 @@ from Node import Node
 
 
 class CameraSubscriberNode(Node):
+    '''
+    This is a simple node to subscribe to camera images and display them. Run it on your own computer to display the
+    RaspiCars camera.
+    '''
+
     def __init__(self, log_level=logging.INFO,
                  zmq_sub_url="tcp://raspberrypi.local:5550",
                  zmq_sub_topic="camera"):

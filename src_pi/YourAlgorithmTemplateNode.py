@@ -1,3 +1,10 @@
+"""
+RaspiCar
+Copyright (c) 2024 (Fynn Luca Maaß) &
+
+Licensed under the Custom License. See the LICENSE file in the project root for license terms.
+"""
+
 from utils.timer_utils import timer
 import zmq
 from utils.message_utils import create_json_message, parse_jpg_image_message

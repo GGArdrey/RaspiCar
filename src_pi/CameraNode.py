@@ -1,3 +1,10 @@
+"""
+RaspiCar
+Copyright (c) 2024 Fynn Luca Maaß
+
+Licensed under the Custom License. See the LICENSE file in the project root for license terms.
+"""
+
 from utils.message_utils import create_image_message, create_jpg_image_message
 import cv2
 import zmq
@@ -37,6 +44,13 @@ class CameraNode(Node):
         self.running = False
 
     def start(self):
+        '''
+        This will start the Camera Node. It will start a dedicated thread to always read the camera buffer at the
+        native frame rate of the camera. THIS IS IMPORTANT, otherwise the buffer will contain old images.
+        It will the publish the most recent frame at the specified frame rate (e.g. 10Hz). Note: Publishing at
+        Full HD @ 30Hz may cause network latency
+
+        '''
         self.running = True
         capture_thread = Thread(target=self.capture_frames)
         capture_thread.start()
@@ -59,6 +73,10 @@ class CameraNode(Node):
             time.sleep(sleep_time)
 
     def capture_frames(self):
+        '''
+        This function reads the camera buffer and saves the most recent frame. A lock is used ebcause this method is ran
+        in a thread. The framebuffer always has to be read, otherwise it will contain old/delayed frames.
+        '''
         while self.running:
             ret, frame = self.cap.read()
             if ret:

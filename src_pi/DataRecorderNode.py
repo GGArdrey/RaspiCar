@@ -1,3 +1,10 @@
+"""
+RaspiCar
+Copyright (c) 2024 Fynn Luca Maaß
+
+Licensed under the Custom License. See the LICENSE file in the project root for license terms.
+"""
+
 import cv2
 import os
 import zmq
@@ -74,12 +81,18 @@ class DataRecorderNode(Node):
         self.zmq_context.term()
 
     def _process_camera_frame(self):
+        '''
+        Image messages are handled here
+        '''
         message = self.image_subscriber.recv_multipart()
         topic, frame, timestamp = parse_jpg_image_message(message)
         self.latest_frame = frame
         self.latest_frame_timestamp = timestamp
 
     def _process_function_commands(self):
+        '''
+        Function commands are handled here to start or stop data recording.
+        '''
         message = self.function_commands_subscriber.recv_string()
         topic, timestamp, payload = parse_json_message(message)
 
@@ -96,7 +109,19 @@ class DataRecorderNode(Node):
                 self._close_subscribers()
                 self.recording = False
 
+    def _process_steering_commands(self):
+        '''
+        steering command messages are handled here
+        '''
+        message = self.steering_commands_subscriber.recv_string()
+        topic, timestamp, payload = parse_json_message(message)
+        self.latest_steering_data = payload
+        self.latest_steering_timestamp = timestamp
+
     def _setup_subscribers(self):
+        '''
+        If recording is started, sets up subscribers to receive image and steering data
+        '''
         # Camera subscriber
         self.image_subscriber = self.zmq_context.socket(zmq.SUB)
         self.image_subscriber.connect(self.image_sub_url)
@@ -116,6 +141,9 @@ class DataRecorderNode(Node):
         self.poller.register(self.steering_commands_subscriber, zmq.POLLIN)
 
     def _close_subscribers(self):
+        '''
+        Will deinitialize subscribers when recording is stopped
+        '''
         if hasattr(self, 'camera_subscriber') and self.image_subscriber:
             self.poller.unregister(self.image_subscriber)
             self.image_subscriber.close()
@@ -126,13 +154,11 @@ class DataRecorderNode(Node):
             self.steering_commands_subscriber.close()
             self.steering_commands_subscriber = None
 
-    def _process_steering_commands(self):
-        message = self.steering_commands_subscriber.recv_string()
-        topic, timestamp, payload = parse_json_message(message)
-        self.latest_steering_data = payload
-        self.latest_steering_timestamp = timestamp
 
     def _save_frame_if_ready(self):
+        '''
+        checks if steering data and camera frame are timely alligned and svaes them.
+        '''
         if self.latest_frame is not None and self.latest_steering_data is not None:
             dt = self.latest_steering_timestamp - self.latest_frame_timestamp
             if abs(dt) <= self.max_time_diff:
@@ -142,11 +168,17 @@ class DataRecorderNode(Node):
                 self.log(f"Time difference between frame and steering data is too large: {dt}, skipping frame...", logging.WARNING)
 
     def setup_recording_dir(self):
+        '''
+        Creates a directory to stor the images
+        '''
         date_time_dir = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
         self.storage_dir = os.path.join(self.save_dir, date_time_dir)
         os.makedirs(self.storage_dir, exist_ok=True)  # Ensure the directory exists
 
     def save_frame_with_label(self, frame, steering_data):
+        '''
+        Saves the images to disk and sets the filename
+        '''
         # Standardize the steering angle
         steering_angle = steering_data["steer"]
 

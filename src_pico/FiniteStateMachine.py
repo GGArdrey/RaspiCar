@@ -152,12 +152,18 @@ class FiniteStateMachine:
         self.state.enter()
 
     def transition_to(self, state_name):
+        '''
+        Transitions the FSM to a different state
+        '''
         print(f"Transitioning to {state_name}")
         self.state.exit()
         self.state = self.states[state_name]
         self.state.enter()
 
     def handle_event(self, event, *args):
+        '''
+        Input alphabet to the FSM are always handled with this method.
+        '''
         try:
             method = getattr(self.state, event)
             if method:

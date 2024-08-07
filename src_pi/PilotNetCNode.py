@@ -1,3 +1,10 @@
+"""
+RaspiCar
+Copyright (c) 2024 Fynn Luca Maaß
+
+Licensed under the Custom License. See the LICENSE file in the project root for license terms.
+"""
+
 from utils.timer_utils import timer
 from utils.pilotnet_utils import resize_and_crop_image
 import numpy as np
@@ -88,6 +95,8 @@ class PilotNetCNode(Node):
 
         weighted_steering_value = weighted_steering_value / weighted_steering_prob if weighted_steering_prob > 0 else 0
 
+        # Here, all steering_commands are specified + more information. It does not hurt when you extend the steering commands,
+        # but you always need the 6 default keys in the dict
         payload = {
             "steer": weighted_steering_value,
             "throttle": 0,

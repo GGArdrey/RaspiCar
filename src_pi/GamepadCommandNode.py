@@ -1,3 +1,10 @@
+"""
+RaspiCar
+Copyright (c) 2024 Fynn Luca Maaß
+
+Licensed under the Custom License. See the LICENSE file in the project root for license terms.
+"""
+
 import zmq
 import time
 from utils.message_utils import create_json_message, parse_json_message
@@ -44,11 +51,11 @@ class GamepadCommandNode(Node):
                 topic, timestamp, payload = parse_json_message(message)
                 if topic == self.gamepad_sub_topic:
                     steering_commands, function_commands = self.translate_gamepad_input(payload)
-                    if steering_commands:
+                    if steering_commands: # send all steering commands
                         self.zmq_publisher.send(create_json_message(steering_commands, self.gamepad_steering_commands_pub_topic, timestamp))
-                    if function_commands:
+                    if function_commands: # send all function commands
                         self.zmq_publisher.send(create_json_message(function_commands, self.gamepad_function_commands_pub_topic, timestamp))
-                elif topic == self.gamepad_sub_topic_disconnected:
+                elif topic == self.gamepad_sub_topic_disconnected: # if the gamepad disconnected, send this
                     steering_commands = {
                         "steer": 0.0,
                         "throttle": 0.0,
@@ -69,7 +76,11 @@ class GamepadCommandNode(Node):
         self.zmq_context.term()
 
     def translate_gamepad_input(self, payload):
-        # Start with default values
+        '''
+        Do the button/joystick mapping to higher level commands
+        '''
+
+        # Start with default values for steering
         steering_commands = {
             "steer": 0.0,
             "throttle": 0.0,
@@ -79,12 +90,14 @@ class GamepadCommandNode(Node):
             "sensors_disable": 0
         }
 
+        # Start with default values for the functions
         function_commands = {
             "start_data_recording": 0,
             "stop_data_recording": 0
         }
 
         # Handle joystick and trigger inputs
+        # Average forward/backwards throttle, deadzone joystick and map raw values to -1, 1 range
         if "left_stick_x" in payload:
             steer_value = payload["left_stick_x"]
             steering_commands["steer"] = 0 if abs(steer_value) <= self.joystick_deadzone else steer_value

@@ -5,11 +5,18 @@ from machine import Timer
 from FiniteStateMachine import FiniteStateMachine
 
 def range_mapping(x, in_min, in_max, out_min, out_max):
+    '''
+    Maps a value to a given range
+    '''
     val = (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
     return int(val)
 
 
 class CommunicationManager:
+    '''
+    This class is the communication endpoint and receives UART commands from the raspberry Pi.
+    This class triggers the FSM which then triggers actions on the car.
+    '''
     def __init__(self, car_instance):
         self.uart = machine.UART(0, 115200)
         self.uart.init(115200, bits=8, parity=None, stop=1, timeout=100)
@@ -49,7 +56,7 @@ class CommunicationManager:
             while True:
                 char = self.uart.read(1)
                 if char:
-                    if char in [b'\n', b'\r']:
+                    if char in [b'\n', b'\r']: # a UART command end with a \n or \r char
                         break
                     buffer += char
             return buffer.decode('utf-8').strip() if buffer else ''
@@ -90,14 +97,22 @@ class CommunicationManager:
         print("Front distance: ", front_distance, "Rear distance: ", rear_distance)
 
     def watchdog_callback(self, timer):
-        # TODO maybe move ing_sucess() and ping_timeout() in one ping() function and use this ping() function
-        #  as callback instead of this. Like it is with read sensors
+        '''
+        This is a watchdog callback that is triggered by a Timer for the heartbeat message. This watchdog will set the
+        self.ping_alive to false periodically.
+        A when the ping_alive message is received over UART, it sets self.ping_alive to true. If the ping_alive was not
+        set to true between two watchdog calls, a emergency stop is activated.
+        '''
         if not self.ping_alive:
             self.ping_timeout(None)
         self.ping_alive = False
 
 
 class CarAbstractionLayer:
+    '''
+    This class is an abstraction of the physical car. All sensors and activators can be accessed with ths class.
+    The specific GPIO wiring is specified here as well.
+    '''
     def __init__(self):
         self.servo_neutral = 4500
         self.servo_max_left = 2500

@@ -1,12 +1,19 @@
-import logging
+"""
+RaspiCar
+Copyright (c) 2024 Fynn Luca Maaß
 
+Licensed under the Custom License. See the LICENSE file in the project root for license terms.
+"""
+
+import logging
 import zmq
 import time
 from utils.message_utils import create_json_message, parse_json_message
 from Node import Node
-from CommandInterface import CommandInterface  # Import the CommandInterface
+from CommandInterface import CommandInterface
 
-# TODO should this node start even when no controller command is received?
+# Note: should this node start even when no controller command is received?
+# Currently, it will start
 
 class ControlFusionNode(Node):
     def __init__(self, log_level=logging.INFO,
@@ -84,7 +91,7 @@ class ControlFusionNode(Node):
             self.publish_message(fused_msg)
 
     def _process_gamepad_message(self, current_time):
-        message = self.gamepad_subscriber.recv_string() #TOOD: check if normal receive is also possible
+        message = self.gamepad_subscriber.recv_string()
         _, timestamp, payload = parse_json_message(message)
         self.current_gamepad_msg = payload
         self.update_override_end_times(current_time)
