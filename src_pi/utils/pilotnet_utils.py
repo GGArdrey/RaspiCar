@@ -1,3 +1,10 @@
+"""
+RaspiCar
+Copyright (c) 2024 Fynn Luca Maaß
+
+Licensed under the Custom License. See the LICENSE file in the project root for license terms.
+"""
+
 import cv2
 
 def resize_and_crop_image(image, target_width=200, target_height=66):

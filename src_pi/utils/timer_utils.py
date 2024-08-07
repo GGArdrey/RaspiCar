@@ -1,3 +1,10 @@
+"""
+RaspiCar
+Copyright (c) 2024 Fynn Luca Maaß
+
+Licensed under the Custom License. See the LICENSE file in the project root for license terms.
+"""
+
 import time
 from contextlib import contextmanager
 import logging
