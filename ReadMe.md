@@ -2,6 +2,11 @@
 
 RaspiCar is a project designed for operating a Raspberry Pi-powered car. This repository contains all the necessary code, documentation, and resources to get started controlling the car.
 
+## Documentation
+
+For detailed setup and usage instructions, please refer to the [Reference Manual](./doc/Reference_Manual_RaspiCar.pdf).
+
+
 ## Repository Structure
 
 - **Notebooks/**
