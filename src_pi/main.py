@@ -15,6 +15,7 @@ from Node import Node
 from DataRecorderNode import DataRecorderNode
 from GamepadCommandNode import GamepadCommandNode
 from ControlFusionNode import ControlFusionNode
+from UARTInterfaceNode import UARTInterfaceNode
 from PilotNetCNode import PilotNetCNode
 from LaneDetectionNode import LaneDetectionNode
 from YourAlgorithmTemplateNode import YourAlgorithmTemplateNode
@@ -54,11 +55,12 @@ if __name__ == "__main__":
     # Note: In the args list, you need a comma after the last parameter if you not exhaustivly specified all parameters the node takes
     node_configs = [
         {"node_class": ControlFusionNode, "args": (log_level,)},
+        {"node_class": UARTInterfaceNode, "args": ('INFO',)},
         {"node_class": CameraNode, "args": (log_level,)},
         {"node_class": XboxGamepadNode, "args": (log_level,)},
         {"node_class": GamepadCommandNode, "args": (log_level,)},
         {"node_class": DataRecorderNode, "args": (log_level,)},
-        {"node_class": YourAlgorithmTemplateNode, "args": (log_level,)}, # HERE YOU CAN CHANGE YOUR SELF IMPLEMENTED NODE
+        # {"node_class": YourAlgorithmTemplateNode, "args": (log_level,)}, # HERE YOU CAN CHANGE YOUR SELF IMPLEMENTED NODE
     ]
 
 

@@ -12,6 +12,7 @@ from utils.message_utils import parse_jpg_image_message, parse_json_message
 import logging
 from datetime import datetime
 from Node import Node
+import csv
 
 class DataRecorderNode(Node):
     def __init__(self, log_level=logging.INFO,
@@ -22,15 +23,28 @@ class DataRecorderNode(Node):
                  gamepad_function_sub_url="tcp://localhost:5541",
                  gamepad_function_sub_topic="gamepad_function_commands",
                  steering_commands_url="tcp://localhost:5541",
-                 steering_commands_topic="gamepad_steering_commands"):
+                 steering_commands_topic="gamepad_steering_commands",
+                 pico_data_url="tcp://localhost:5580",
+                 pico_data_topic="pico_data"):
 
         super().__init__(log_level=log_level)
+        self.pico_data_url = pico_data_url
+        self.pico_data_topic = pico_data_topic
+        self.latest_pico_data = None
+        self.latest_pico_timestamp = None
+        self.pico_csv_writer = None
+
+        self.frame_log_file = None
+
         self.image_sub_url = image_sub_url
         self.image_sub_topic = image_sub_topic
+
         self.gamepad_function_sub_url = gamepad_function_sub_url
         self.gamepad_function_sub_topic = gamepad_function_sub_topic
+
         self.steering_commands_sub_url = steering_commands_url
         self.steering_commands_sub_topic = steering_commands_topic
+
         self.save_dir = save_dir
         self.max_time_diff = max_time_diff  # Maximum allowable time difference between frame and gamepad data
         self.running = False
@@ -69,6 +83,9 @@ class DataRecorderNode(Node):
                 if self.steering_commands_subscriber in events:
                     self._process_steering_commands()
 
+                if self.pico_data_subscriber in events:
+                    self._process_pico_data()
+
                 # Always try to save the latest frame with the latest steering data
                 self._save_frame_if_ready()
 
@@ -79,6 +96,9 @@ class DataRecorderNode(Node):
         if hasattr(self, 'steering_commands_subscriber') and self.steering_commands_subscriber:
             self.steering_commands_subscriber.close()
         self.zmq_context.term()
+
+        if self.pico_csv_writer:
+            self.pico_csv_writer = None  # Ensure the CSV file is closed
 
     def _process_camera_frame(self):
         '''
@@ -118,6 +138,29 @@ class DataRecorderNode(Node):
         self.latest_steering_data = payload
         self.latest_steering_timestamp = timestamp
 
+    def _process_pico_data(self):
+        '''
+        Processes pico_data (gyro, accel, and TOF) and writes to CSV
+        '''
+        message = self.pico_data_subscriber.recv_string()
+        topic, timestamp, payload = parse_json_message(message)
+        self.latest_pico_data = payload
+        self.latest_pico_timestamp = timestamp
+
+        # Write pico_data to CSV file
+        if self.pico_csv_writer:
+            row = {
+                'timestamp': timestamp,
+                'gyro_x': payload['GX'],
+                'gyro_y': payload['GY'],
+                'gyro_z': payload['GZ'],
+                'accel_x': payload['AX'],
+                'accel_y': payload['AY'],
+                'accel_z': payload['AZ'],
+                'tof': payload['TOF']
+            }
+            self.pico_csv_writer.writerow(row)
+
     def _setup_subscribers(self):
         '''
         If recording is started, sets up subscribers to receive image and steering data
@@ -137,6 +180,11 @@ class DataRecorderNode(Node):
         self.image_subscriber.setsockopt(zmq.CONFLATE, 1)  # Keep only the latest message
         self.steering_commands_subscriber.setsockopt_string(zmq.SUBSCRIBE, self.steering_commands_sub_topic)
 
+        self.pico_data_subscriber = self.zmq_context.socket(zmq.SUB)
+        self.pico_data_subscriber.connect(self.pico_data_url)
+        self.pico_data_subscriber.setsockopt_string(zmq.SUBSCRIBE, self.pico_data_topic)
+
+        self.poller.register(self.pico_data_subscriber, zmq.POLLIN)
         self.poller.register(self.image_subscriber, zmq.POLLIN)
         self.poller.register(self.steering_commands_subscriber, zmq.POLLIN)
 
@@ -153,6 +201,16 @@ class DataRecorderNode(Node):
             self.poller.unregister(self.steering_commands_subscriber)
             self.steering_commands_subscriber.close()
             self.steering_commands_subscriber = None
+
+        if hasattr(self, 'pico_data_subscriber') and self.pico_data_subscriber:
+            self.poller.unregister(self.pico_data_subscriber)
+            self.pico_data_subscriber.close()
+        if self.pico_csv_writer:
+            self.pico_csv_writer = None  # Close CSV writer when done recording
+
+        if self.frame_log_file:
+            self.frame_log_file.close()
+            self.frame_log_file = None
 
 
     def _save_frame_if_ready(self):
@@ -175,6 +233,22 @@ class DataRecorderNode(Node):
         self.storage_dir = os.path.join(self.save_dir, date_time_dir)
         os.makedirs(self.storage_dir, exist_ok=True)  # Ensure the directory exists
 
+        # Create pico_data CSV file
+        pico_csv_path = os.path.join(self.storage_dir, "pico_data.csv")
+        pico_csv_file = open(pico_csv_path, 'w', newline='')
+        self.pico_csv_writer = csv.DictWriter(pico_csv_file, fieldnames=[
+            'timestamp', 'gyro_x', 'gyro_y', 'gyro_z', 'accel_x', 'accel_y', 'accel_z', 'tof'
+        ])
+        self.pico_csv_writer.writeheader()
+
+        # Create a file for logging frame number and timestamp
+        frame_log_path = os.path.join(self.storage_dir, "frame_log.csv")
+        self.frame_log_file = open(frame_log_path, 'w', newline='')
+        self.frame_log_writer = csv.writer(self.frame_log_file)
+        # Write the header row
+        self.frame_log_writer.writerow(['frame_number', 'frame_timestamp', "steering_timestamp", 'steering_angle'])
+
+
     def save_frame_with_label(self, frame, steering_data):
         '''
         Saves the images to disk and sets the filename
@@ -182,9 +256,14 @@ class DataRecorderNode(Node):
         # Standardize the steering angle
         steering_angle = steering_data["steer"]
 
-        image_path = os.path.join(self.storage_dir, f"{self.image_count}_{steering_angle}.jpg")
+        image_path = os.path.join(self.storage_dir, f"{self.image_count}_{steering_angle:.4f}.jpg")
         cv2.imwrite(image_path, frame)
-        self.log(f"Saved frame {self.image_count} with steering data {steering_angle}.", logging.INFO)
+
+        # Log frame number and timestamp to the frame log file
+        if self.frame_log_writer:
+            self.frame_log_writer.writerow([self.image_count, self.latest_frame_timestamp, self.latest_steering_timestamp, steering_angle])
+
+        self.log(f"Saved frame {self.image_count} with steering data {steering_angle:.4f}.", logging.INFO)
         self.image_count += 1
 
 # Example usage:

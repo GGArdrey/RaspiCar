@@ -1,6 +1,7 @@
 import machine
 import time
 from vl53l0x import VL53L0X
+import MPU6050
 from machine import Timer
 from FiniteStateMachine import FiniteStateMachine
 
@@ -38,7 +39,7 @@ class CommunicationManager:
     def process_commands(self):
         while True:
             line = self.read_line_from_uart()
-            print("received command: ", line)
+            #print("received command: ", line)
             if not line:
                 continue
             command, *args = line.split(",")
@@ -91,10 +92,20 @@ class CommunicationManager:
 
     def read_sensors(self, timer):
         front_distance = self.car.measure_front_distance()
-        rear_distance = self.car.measure_rear_distance()
-        self.fsm.handle_event('front_tof_measurement', front_distance)
-        self.fsm.handle_event('rear_tof_measurement', rear_distance)
-        print("Front distance: ", front_distance, "Rear distance: ", rear_distance)
+
+        #TODO enable rear sensor, currently disabled due to mpu setup -> place on same i2c bus in future
+        #rear_distance = self.car.measure_rear_distance()
+        #self.fsm.handle_event('front_tof_measurement', front_distance)
+        #self.fsm.handle_event('rear_tof_measurement', rear_distance)
+        #print("Front distance: ", front_distance, "Rear distance: ", rear_distance)
+
+        # Read accelerometer data
+        accel_x, accel_y, accel_z = self.car.mpu.read_accel_data()
+        # Read gyroscope data
+        gyro_x, gyro_y, gyro_z = self.car.mpu.read_gyro_data()
+        # Format the sensor data as a string
+        data_str = f"AX:{accel_x:.4f},AY:{accel_y:.4f},AZ:{accel_z:.4f},GX:{gyro_x:.4f},GY:{gyro_y:.4f},GZ:{gyro_z:.4f},TOF:{front_distance}\n"
+        self.uart.write(data_str)
 
     def watchdog_callback(self, timer):
         '''
@@ -150,7 +161,13 @@ class CarAbstractionLayer:
         self.i2c_front = machine.I2C(0, scl=machine.Pin(5), sda=machine.Pin(4))
 
         self.tof_front = VL53L0X(self.i2c_front)
-        self.tof_back = VL53L0X(self.i2c_back)
+        #self.tof_back = VL53L0X(self.i2c_back)
+
+        # Set up the MPU6050 class (imu sensor)
+        # wake up the MPU6050 from sleep
+        self.mpu = MPU6050.MPU6050(self.i2c_back)
+        self.mpu.wake()
+        self.mpu.write_accel_range(1)
 
         self.sensor_timer = Timer(-1)
         self.watchdog_timer = Timer(-1)
@@ -190,7 +207,7 @@ class CarAbstractionLayer:
         self.servo_pwm.duty_u16(max(min(amount, self.servo_max_right), self.servo_max_left))
 
     def start_sensors(self, callback):
-        self.sensor_timer.init(period=100, mode=Timer.PERIODIC, callback=callback)
+        self.sensor_timer.init(period=33, mode=Timer.PERIODIC, callback=callback) #read sensors at 33hz
 
     def stop_sensors(self):
         self.sensor_timer.deinit()
@@ -228,7 +245,7 @@ if __name__ == "__main__":
     picar.start_watchdog(comm_manager.watchdog_callback)
 
     # Start sensor reading with the callback to comm_manager
-    picar.start_sensors(comm_manager.read_sensors)
+    picar.start_sensors(callback=comm_manager.read_sensors)
 
     time.sleep(1)
     comm_manager.process_commands()
