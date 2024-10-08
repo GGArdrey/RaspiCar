@@ -98,7 +98,7 @@ class UARTInterfaceNode(Node):
 
                             self.publish_pico_data(data_dict)
                             self.log(f"Pico Data: {line}", logging.DEBUG)
-                time.sleep(0.01)
+                time.sleep(0.02) #TODO: Adjust sleep time
             except Exception as e:
                 self.log(f"Error in read_pico_data: {e}", logging.ERROR)
 

@@ -207,7 +207,7 @@ class CarAbstractionLayer:
         self.servo_pwm.duty_u16(max(min(amount, self.servo_max_right), self.servo_max_left))
 
     def start_sensors(self, callback):
-        self.sensor_timer.init(period=33, mode=Timer.PERIODIC, callback=callback) #read sensors at 33hz
+        self.sensor_timer.init(period=50, mode=Timer.PERIODIC, callback=callback) #read sensors at 20hz TODO: increase? Evaluate Performance
 
     def stop_sensors(self):
         self.sensor_timer.deinit()
