@@ -54,24 +54,24 @@ if __name__ == "__main__":
     # to also specify Framerate, CameraID, Width, Height
     # Note: In the args list, you need a comma after the last parameter if you not exhaustivly specified all parameters the node takes
     node_configs = [
-        {"node_class": ControlFusionNode, "args": (log_level,)},
+        {"node_class": ControlFusionNode, "args": ("DEBUG",)},
         {"node_class": UARTInterfaceNode, "args": ('INFO',)},
         {"node_class": CameraNode, "args": (log_level,)},
         {"node_class": XboxGamepadNode, "args": (log_level,)},
         {"node_class": GamepadCommandNode, "args": (log_level,)},
         {"node_class": DataRecorderNode, "args": (log_level,0.15,'/home/pi/data/','tcp://localhost:5550','camera', 'tcp://localhost:5541','gamepad_function_commands','tcp://localhost:5570','fused_steering_commands')},
-        {"node_class": PilotNetCNode, "args": (log_level,)}, # HERE YOU CAN CHANGE YOUR SELF IMPLEMENTED NODE
+        {"node_class": PilotNetCNode, "args": ("DEBUG",)}, # HERE YOU CAN CHANGE YOUR SELF IMPLEMENTED NODE
     ]
-    max_time_diff = 0.1,
-    save_dir = '/home/pi/data/',
-    image_sub_url = "tcp://localhost:5550",
-    image_sub_topic = "camera",
-    gamepad_function_sub_url = "tcp://localhost:5541",
-    gamepad_function_sub_topic = "gamepad_function_commands",
-    steering_commands_url = "tcp://localhost:5541",
-    steering_commands_topic = "gamepad_steering_commands",
-    pico_data_url = "tcp://localhost:5580",
-    pico_data_topic = "pico_data"
+    # max_time_diff = 0.1,
+    # save_dir = '/home/pi/data/',
+    # image_sub_url = "tcp://localhost:5550",
+    # image_sub_topic = "camera",
+    # gamepad_function_sub_url = "tcp://localhost:5541",
+    # gamepad_function_sub_topic = "gamepad_function_commands",
+    # steering_commands_url = "tcp://localhost:5541",
+    # steering_commands_topic = "gamepad_steering_commands",
+    # pico_data_url = "tcp://localhost:5580",
+    # pico_data_topic = "pico_data"
 
     processes = []
 
