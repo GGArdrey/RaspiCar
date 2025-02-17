@@ -54,7 +54,7 @@ if __name__ == "__main__":
     # to also specify Framerate, CameraID, Width, Height
     # Note: In the args list, you need a comma after the last parameter if you not exhaustivly specified all parameters the node takes
     node_configs = [
-        {"node_class": ControlFusionNode, "args": ("DEBUG",)},
+        {"node_class": ControlFusionNode, "args": ("DEBUG",0.0,"tcp://luca-MS-7D75:5560")},#
         {"node_class": UARTInterfaceNode, "args": ('INFO',)},
         {"node_class": CameraNode, "args": (log_level,)},
         {"node_class": XboxGamepadNode, "args": (log_level,)},
