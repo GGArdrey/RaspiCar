@@ -41,7 +41,11 @@ class GamepadCommandNode(Node):
             "A": "start_data_recording",
             "Y": "stop_data_recording",
             "X": "sensors_enable",
-            "B": "sensors_disable"
+            "B": "sensors_disable",
+            "dpad_left": "LEFT",
+            "dpad_right": "RIGHT",
+            "dpad_up": "STRAIGHT",
+            "dpad_down": "LANEFOLLOW"
         }
 
     def start(self):
@@ -58,6 +62,7 @@ class GamepadCommandNode(Node):
                 elif topic == self.gamepad_sub_topic_disconnected: # if the gamepad disconnected, send this
                     steering_commands = {
                         "steer": 0.0,
+                        "control_command": "LANEFOLLOW",
                         "throttle": 0.0,
                         "emergency_stop": 1,
                         "reset_emergency_stop": 0,
@@ -83,6 +88,7 @@ class GamepadCommandNode(Node):
         # Start with default values for steering
         steering_commands = {
             "steer": 0.0,
+            "control_command": "LANEFOLLOW",
             "throttle": 0.0,
             "emergency_stop": 0,
             "reset_emergency_stop": 0,
@@ -105,6 +111,14 @@ class GamepadCommandNode(Node):
             steering_commands["throttle"] += (payload["right_trigger"] + 1) / 2 # mapping raw inputs
         if "left_trigger" in payload:
             steering_commands["throttle"] -= (payload["left_trigger"] + 1) / 2 # mapping raw inputs
+
+        # Handle dpad presses and fill in the control_command
+        for button, command in self.key_mappings.items():
+            if payload.get(button):
+                steering_commands["control_command"] = command
+            # remove the dpad from payload dict
+            if button.startswith("dpad"):
+                payload.pop(button)
 
         # Handle button presses for other commands
         for button, command in self.key_mappings.items():
