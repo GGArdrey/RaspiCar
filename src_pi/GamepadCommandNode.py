@@ -16,7 +16,7 @@ class GamepadCommandNode(Node):
                  joystick_deadzone = 0.15,
                  gamepad_sub_url="tcp://localhost:5540",
                  gamepad_sub_topic="gamepad",
-                 gamepad_command_pub_url="tcp://localhost:5541",
+                 gamepad_command_pub_url="tcp://raspberrypi.local::5541",
                  gamepad_function_commands_pub_topic = "gamepad_function_commands",
                  gamepad_steering_commands_pub_topic = "gamepad_steering_commands"):
         super().__init__(log_level=log_level)
