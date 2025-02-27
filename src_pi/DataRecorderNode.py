@@ -16,7 +16,7 @@ import csv
 
 class DataRecorderNode(Node):
     def __init__(self, log_level=logging.INFO,
-                 max_time_diff=0.1,
+                 max_time_diff=0.15,
                  save_dir='/home/pi/data/',
                  image_sub_url="tcp://localhost:5550",
                  image_sub_topic="camera",
@@ -255,8 +255,9 @@ class DataRecorderNode(Node):
         '''
         # Standardize the steering angle
         steering_angle = steering_data["steer"]
+        control_command = steering_data["control_command"]
 
-        image_path = os.path.join(self.storage_dir, f"{self.image_count}_{steering_angle:.4f}.jpg")
+        image_path = os.path.join(self.storage_dir, f"{self.image_count}_{control_command}_{steering_angle:.4f}.jpg")
         cv2.imwrite(image_path, frame)
 
         # Log frame number and timestamp to the frame log file

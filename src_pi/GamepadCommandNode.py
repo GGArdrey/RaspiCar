@@ -45,7 +45,7 @@ class GamepadCommandNode(Node):
             "dpad_left": "LEFT",
             "dpad_right": "RIGHT",
             "dpad_up": "STRAIGHT",
-            "dpad_down": "LANEFOLLOW"
+            #"dpad_down": "LANEFOLLOW" #removed since only using straight is enough
         }
 
     def start(self):
@@ -62,7 +62,7 @@ class GamepadCommandNode(Node):
                 elif topic == self.gamepad_sub_topic_disconnected: # if the gamepad disconnected, send this
                     steering_commands = {
                         "steer": 0.0,
-                        "control_command": "LANEFOLLOW",
+                        "control_command": "STRAIGHT",
                         "throttle": 0.0,
                         "emergency_stop": 1,
                         "reset_emergency_stop": 0,
@@ -88,7 +88,7 @@ class GamepadCommandNode(Node):
         # Start with default values for steering
         steering_commands = {
             "steer": 0.0,
-            "control_command": "LANEFOLLOW",
+            "control_command": "STRAIGHT",
             "throttle": 0.0,
             "emergency_stop": 0,
             "reset_emergency_stop": 0,
@@ -108,21 +108,26 @@ class GamepadCommandNode(Node):
             steer_value = payload["left_stick_x"]
             steering_commands["steer"] = 0 if abs(steer_value) <= self.joystick_deadzone else steer_value
         if "right_trigger" in payload:
-            steering_commands["throttle"] += (payload["right_trigger"] + 1) / 2 # mapping raw inputs
+            steering_commands["throttle"] += (payload["right_trigger"] + 1) / 2  # mapping raw inputs
         if "left_trigger" in payload:
-            steering_commands["throttle"] -= (payload["left_trigger"] + 1) / 2 # mapping raw inputs
+            steering_commands["throttle"] -= (payload["left_trigger"] + 1) / 2  # mapping raw inputs
 
-        # Handle dpad presses and fill in the control_command
+        # First, handle dpad presses separately for control_command
         for button, command in self.key_mappings.items():
-            if payload.get(button):
+            # Only process dpad commands that map to directional controls
+            if button.startswith("dpad") and payload.get(button) and command in ["LEFT", "RIGHT", "STRAIGHT"]:
                 steering_commands["control_command"] = command
-            # remove the dpad from payload dict
-            if button.startswith("dpad"):
-                payload.pop(button)
 
-        # Handle button presses for other commands
+        # Create a copy of the payload for the second loop to avoid modification issues
+        payload_copy = payload.copy()
+
+        # Then handle all other button presses for commands (excluding those already handled)
         for button, command in self.key_mappings.items():
-            if payload.get(button):
+            # Skip dpad buttons that map to directional controls
+            if button.startswith("dpad") and command in ["LEFT", "RIGHT", "STRAIGHT"]:
+                continue
+
+            if payload_copy.get(button):
                 if command in steering_commands:
                     steering_commands[command] = 1
                 else:
