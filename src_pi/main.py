@@ -59,7 +59,7 @@ if __name__ == "__main__":
         {"node_class": CameraNode, "args": (log_level,)},
         {"node_class": XboxGamepadNode, "args": (log_level,)},
         {"node_class": GamepadCommandNode, "args": (log_level,)},
-        #{"node_class": DataRecorderNode, "args": (log_level,0.15,'/home/pi/data/','tcp://localhost:5550','camera', 'tcp://localhost:5541','gamepad_function_commands','tcp://localhost:5570','fused_steering_commands')},
+        {"node_class": DataRecorderNode, "args": (log_level,)},
         #{"node_class": PilotNetCNode, "args": ("DEBUG",)}, # HERE YOU CAN CHANGE YOUR SELF IMPLEMENTED NODE
     ]
     # max_time_diff = 0.1,

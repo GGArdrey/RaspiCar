@@ -42,9 +42,11 @@ class GamepadCommandNode(Node):
             "Y": "stop_data_recording",
             "X": "sensors_enable",
             "B": "sensors_disable",
-            "dpad_left": "LEFT",
-            "dpad_right": "RIGHT",
-            "dpad_up": "STRAIGHT",
+            "left_bumper": "LEFT",
+            "right_bumper": "RIGHT",
+            # "dpad_left": "LEFT",
+            # "dpad_right": "RIGHT",
+            # "dpad_up": "STRAIGHT",
             #"dpad_down": "LANEFOLLOW" #removed since only using straight is enough
         }
 
@@ -115,7 +117,7 @@ class GamepadCommandNode(Node):
         # First, handle dpad presses separately for control_command
         for button, command in self.key_mappings.items():
             # Only process dpad commands that map to directional controls
-            if button.startswith("dpad") and payload.get(button) and command in ["LEFT", "RIGHT", "STRAIGHT"]:
+            if button.endswith("bumper") and payload.get(button) and command in ["LEFT", "RIGHT"]:
                 steering_commands["control_command"] = command
 
         # Create a copy of the payload for the second loop to avoid modification issues

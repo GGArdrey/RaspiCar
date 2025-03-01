@@ -123,6 +123,7 @@ class XboxGamepadNode(Node):
 
     def _publish_gamepad_input(self):
         """Handle the input from the controller."""
+
         current_state = {
             "left_stick_x": self._joystick.get_axis(0),
             "left_stick_y": self._joystick.get_axis(1),
@@ -140,10 +141,18 @@ class XboxGamepadNode(Node):
             "start": self._joystick.get_button(7),
             "left_stick_click": self._joystick.get_button(9),
             "right_stick_click": self._joystick.get_button(10),
-            "dpad_up": self._joystick.get_button(13),
-            "dpad_down": self._joystick.get_button(14),
-            "dpad_left": self._joystick.get_button(11),
-            "dpad_right": self._joystick.get_button(12)
+
+            #if using newer wireless gamepad (like xbox series blablabla), use the following lines
+            "dpad_up": 1 if self._joystick.get_hat(0)[1] > 0 else 0,
+            "dpad_down": 1 if self._joystick.get_hat(0)[1] < 0 else 0,
+            "dpad_left": 1 if self._joystick.get_hat(0)[0] < 0 else 0,
+            "dpad_right": 1 if self._joystick.get_hat(0)[0] > 0 else 0,
+
+            # If you use xbox360 gamepad, you can use the following commented lines instead
+            # "dpad_up": self._joystick.get_button(13),
+            # "dpad_down": self._joystick.get_button(14),
+            # "dpad_left": self._joystick.get_button(11),
+            # "dpad_right": self._joystick.get_button(12)
         }
 
         #if current_state != self.previous_state:

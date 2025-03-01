@@ -174,14 +174,40 @@ class CarAbstractionLayer:
         self.led_timer = Timer(-1)
 
     def motor_drive(self, in_speed):
+        """
+        Control the motor speed and direction.
+
+        Args:
+            in_speed: Speed value between -100 and 100
+                      Positive values = forward, Negative values = backward
+        """
+        # Constrain the input speed to the valid range
         if not (-100 <= in_speed <= 100):
             print("Warning: motor_drive: in_speed must be between -100 and 100")
             in_speed = max(min(in_speed, 100), -100)
 
-        speed = range_mapping(abs(in_speed), 0, 100, 50001, 74999) if in_speed != 0 else 0
+        # Determine direction
         new_direction = "backward" if in_speed < 0 else "forward"
 
+        # Calculate PWM duty cycle
+        # For many DC motors, the minimum PWM needed to overcome inertia is around 20-30%
+        if in_speed == 0:
+            speed = 0  # Stop the motor
+        else:
+            # Map from 0-100 to appropriate PWM range (~20% minimum to 100% maximum)
+            min_pwm = 13107  # Approximately 20% of 65535
+            max_pwm = 65535  # Maximum 16-bit value
+            speed = range_mapping(abs(in_speed), 0, 100, min_pwm, max_pwm)
+
+        # Change direction if needed
         if new_direction != self.direction:
+            # Stop the motor briefly when changing direction (optional, can help protect the motor)
+            if self.direction != "" and in_speed != 0:  # If not first initialization
+                self.motor_A_pwm.duty_u16(0)
+                self.motor_B_pwm.duty_u16(0)
+                time.sleep(0.05)  # Brief delay when changing direction
+
+            # Set direction pins
             if new_direction == "forward":
                 self.motor_A_B.off()
                 self.motor_B_B.off()
@@ -195,6 +221,7 @@ class CarAbstractionLayer:
 
             self.direction = new_direction
 
+        # Apply the PWM value to both motors
         self.motor_A_pwm.duty_u16(speed)
         self.motor_B_pwm.duty_u16(speed)
 
