@@ -125,10 +125,32 @@ class CarAbstractionLayer:
     The specific GPIO wiring is specified here as well.
     '''
     def __init__(self):
-        self.servo_neutral = 4500
-        self.servo_max_left = 2500
-        self.servo_max_right = 6500
-        self.servo_frequency = 50
+        #Old servo parameters
+        # self.servo_neutral = 4500
+        # self.servo_max_left = 2500
+        # self.servo_max_right = 6500
+        # self.servo_frequency = 50
+
+        '''
+        # Update servo parameters for JX 6221MG
+        Totes Band: 2 μs
+        Arbeitsfrequenz: 1520 μs / 330 Hz
+        Betriebsgeschwindigkeit (4,8 V): 0,18 Sek./60°
+        Betriebsgeschwindigkeit (6 V): 0,16 Sek./60°
+        Stalldrehmoment (4,8 V): 17,25 kg/cm
+        Stalldrehmoment (6 V): 20,32 kg/cm
+        Abmessungen: 40,5X20.2X38mm
+        Gewicht: 62 g
+        Länge des Anschlusskabels: JR 265 mm
+        Lager: 2BB
+        Zahnte: 25
+        '''
+        self.servo_frequency = 330  # 330 Hz as per specs
+        self.servo_neutral = 32767  # Middle position (50% duty cycle)
+        # For a reasonable steering range, we'll use approximately ±20% from neutral
+        self.servo_max_left = 26214  # ~40% duty cycle
+        self.servo_max_right = 39321  # ~60% duty cycle
+
         self.motor_frequency = 15000
         self.direction = ""
         self.led = machine.Pin(25, machine.Pin.OUT)
