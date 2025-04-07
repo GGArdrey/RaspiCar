@@ -1,0 +1,2 @@
+# use this to open the ports on the desktop machine if you distribute nodes
+sudo iptables -A INPUT -p tcp --dport 5560 -j ACCEPT
